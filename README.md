@@ -1,6 +1,6 @@
-# direct-input
+# direct-input23
  
-direct-input は IME を使用せずに漢字を入力できる AutoHotKey 用のスクリプトです。
+direct-input23.ahk は、IME を使用せずに漢字を入力できる AutoHotKey 用のスクリプトです。
 
 ![direct-input](./outputcrop.gif)
 
