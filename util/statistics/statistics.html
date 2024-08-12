@@ -1,0 +1,70 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>読み辞書統計情報</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0 auto; padding: 20px; max-width: 800px; }
+        h1, h2 { color: #333; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .control { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h1>読み辞書統計情報</h1>
+    <div id="totalEntries"></div>
+
+    <h2>読みの1文字目の集計</h2>
+    <div id="readingFirstChar"></div>
+
+    <h2>読みの末尾文字の集計</h2>
+    <div id="readingLastChar"></div>
+
+    <h2>登録漢字の1文字目ランキング</h2>
+    <div class="control">
+        <label for="kanjiFirstCharCount">表示件数: </label>
+        <select id="kanjiFirstCharCount" onchange="updateTable('kanjiFirstChar')">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+        </select>
+    </div>
+    <div id="kanjiFirstChar"></div>
+
+    <h2>登録漢字の末尾文字ランキング</h2>
+    <div class="control">
+        <label for="kanjiLastCharCount">表示件数: </label>
+        <select id="kanjiLastCharCount" onchange="updateTable('kanjiLastChar')">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+        </select>
+    </div>
+    <div id="kanjiLastChar"></div>
+
+    <h2>特定の文字を含むエントリの抽出</h2>
+    <div class="control">
+        <label for="extractType">抽出対象: </label>
+        <select id="extractType">
+            <option value="reading">読み</option>
+            <option value="kanji">登録漢字</option>
+        </select>
+        <label for="extractPosition">文字位置: </label>
+        <select id="extractPosition"></select>
+        <label for="extractChar">文字: </label>
+        <input type="text" id="extractChar" maxlength="1">
+        <button onclick="extractEntries()">抽出</button>
+    </div>
+    <div id="extractResult"></div>
+
+    <h2>2文字読みの一覧表</h2>
+    <div id="twoCharReadings"></div>
+
+    <script src="statistics.js"></script>
+</body>
+</html>
