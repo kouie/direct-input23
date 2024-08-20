@@ -24,7 +24,7 @@ global debugMode := 1
 GUI_init() {
 	Gui, +AlwaysOnTop +ToolWindow -Caption
 	Gui, Font, s12
-	Gui, Add, Text, vInputDisplay w130
+	Gui, Add, Text, vInputDisplay w150
 	Gui, Show, NoActivate x0 y0
 }
 
@@ -133,22 +133,24 @@ CheckAndConvert() {
 ; 直前の変換を対象に、区切り位置を(2文字目の後に)変更して再変換
 reConvert(){
 	if ( StrLen(lastFixKey) > 2 ) {
-		backup := inputBuffer
-		backcount := strLen(lastFixValue)+strLen(backup)
-		redopart := SubStr(lastFixKey,strLen(lastFixKey2)+1)
-		SendInput, {BS %backcount%}%lastFixValue2%%redopart%%backup%
-		lastFixKeyBackup := lastFixKey
-		lastFixKey2Backup := lastFixKey2
+		if (lastfixKey2 == SubStr(lastfixKey,1,2)) {
+			backup := inputBuffer
+			backcount := strLen(lastFixValue)+strLen(backup)
+			redopart := SubStr(lastFixKey,strLen(lastFixKey2)+1)
+			SendInput, {BS %backcount%}%lastFixValue2%%redopart%%backup%
+			lastFixKeyBackup := lastFixKey
+			lastFixKey2Backup := lastFixKey2
 
-		clearBuffer() 
-		inputBuffer := SubStr(lastFixKey,strLen(lastFixKey2)+1)
-		inputBUffer .= backup
-		CheckAndConvert()
-		if ( lastFixKey == lastFixKeyBackup ){
-				lastFixKey := lastFixKey2Backup
+			clearBuffer() 
+			inputBuffer := SubStr(lastFixKey,strLen(lastFixKey2)+1)
+			inputBUffer .= backup
+			CheckAndConvert()
+			if ( lastFixKey == lastFixKeyBackup ){
+					lastFixKey := lastFixKey2Backup
+			}
+			lastFixKey2 := lastFixKey2Backup
+			UpdateDisplay()
 		}
-		lastFixKey2 := lastFixKey2Backup
-		UpdateDisplay()
 	}
 }
 
