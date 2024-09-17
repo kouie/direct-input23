@@ -3,8 +3,13 @@
 #SingleInstance, Force
 
 ; 変換を有効にするアプリケーショングループを作成
-GroupAdd, userenso, Google Chrome
+;GroupAdd, userenso, Google Chrome
 GroupAdd, userenso, メモ帳
+
+GroupAdd, userenso, 氏名入力
+GroupAdd, userenso, データ入力 -
+GroupAdd, userenso, お仕事メニュー
+GroupAdd, userenso, 自宅で仕事
 
 global dictionaryFile := "dictionary.txt"
 global inputBuffer := ""
@@ -24,7 +29,7 @@ global debugMode := 1
 GUI_init() {
 	Gui, +AlwaysOnTop +ToolWindow -Caption
 	Gui, Font, s12
-	Gui, Add, Text, vInputDisplay w150
+	Gui, Add, Text, vInputDisplay w200
 	Gui, Show, NoActivate x0 y0
 }
 
@@ -66,7 +71,7 @@ LoadDictionary(fileName) {
 
 ; 情報ウィンドウを更新
 UpdateDisplay() {
-    GuiControl,, InputDisplay, F2:%lastFixKey2% F1:%lastFixKey% || %inputBuffer% 
+    GuiControl,, InputDisplay, d:%lastDispLength% b:%lastLength% F2:%lastFixKey2% F1:%lastFixKey% || %inputBuffer% 
 }
 
 ; 入力バッファの内容を変換
@@ -76,25 +81,22 @@ CheckAndConvert() {
     if (StrLen(inputBuffer) == 1){
     	return
     }
-    for key, value in dictionary {
-;;        if (SubStr(inputBuffer, -StrLen(key)+1) == key && StrLen(key) > maxLength) {
-;;            maxLength := StrLen(key)
-;;            matchedKey := key
-;;        }
-		if (inputBuffer == key) {
-			matchedKey := key
-			length := StrLen(key)
-			if (matchCount == 0){
-				bsLength := length
-				lastLength := length
-			} else {
-				bsLength := length - lastLength + lastDispLength
-				lastLength := length
-			}
-			break
+    
+    value := dictionary[inputBuffer]
+	key := inputBuffer
+
+	if (value != "") {
+		matchedKey := key
+		length := StrLen(key)
+		if (matchCount == 0){
+			bsLength := length
+			lastLength := length
+		} else {
+			bsLength := length - lastLength + lastDispLength
+			lastLength := length
 		}
     }
-    UpdateDisplay()
+;;    UpdateDisplay()
     
     if (matchedKey != "") {
     	dicmatch := dictionary[matchedKey]
@@ -162,6 +164,22 @@ clearBuffer() {
 	matchCount := 0	
 }
 
+; 読みを検索
+searchValue() {
+	target := clipboard
+	length := StrLen(target)
+	if (length < 3){
+	    for key, value in dictionary {
+	    	if (target == value) {
+;			    GuiControl,, InputDisplay, value F2:%lastFixKey2% F1:%lastFixKey% || %inputBuffer% 
+				MsgBox, 検索:  %target% `n読み:  %key% `n登録:  %value%
+		    	break
+	    	}
+		}
+	}
+}
+
+
 ; スクリプトの初期化時に辞書を読み込む
 LoadDictionary(dictionaryFile)
 GUI_init()
@@ -205,6 +223,7 @@ $7::
 $8::
 $9::
 $@::
+$.::
 	key1 := SubStr(A_ThisHotkey, 2)
 	SendInput, %key1%
 	inputBuffer .= SubStr(A_ThisHotkey, 2)
@@ -221,11 +240,17 @@ return
 ; 入力バッファから1文字削除 (画面内の未確定も同期)
 ^h::
 	Suspend, Permit
+
 	SendInput, {BS}
+	rinputBuffer := inputBuffer
 	inputBuffer := SubStr(inputBuffer,1, -1)
 	lastDispLength -= 1
 	lastLength -= 1
-	if (lastDispLength == 0){
+	if(rinputBuffer == lastFixKey){
+		clearBuffer()
+	}
+
+	if (lastDispLength =< 0){
 		clearBuffer()
 	}
 	UpdateDisplay()
@@ -236,6 +261,7 @@ Enter::
 	SendInput, {Enter}
 	clearBuffer()
 	UpdateDisplay()
+	
 return
 
 Space::
@@ -244,7 +270,7 @@ Space::
 	UpdateDisplay()
 return
 
-^Space::
+!^Space::
 	clearBuffer()
 	UpdateDisplay()
 return
@@ -263,7 +289,7 @@ return
 
 
 ; 変換システムを一時停止 (IMEに切替)
-^q::
+!F12::
 	Suspend
 	active ^= 1
 	if (active == 0) {
@@ -279,7 +305,7 @@ return
 return
 
 ; 変換システムをリセット (IMEはオフ)
-^!s::
+!F11::
 	Suspend, Permit
 	IME_SET(0)
 	Reload
@@ -296,4 +322,67 @@ return
 	}
 return
 
+^g::
+	Suspend, Permit
+
+	Suspend, Off
+
+	IME_SET(0)
+	clipboard := ""
+	Send, +{Home}^c
+	ClipWait,1
+	if ErrorLevel
+	{
+	    return
+	}
+	searchValue()
+
+	active := 1
+	Gui, Color, eeeeee
+	UpdateDisplay()
+return
+
+^f::
+return
+
+
+^Space::
+	Suspend
+	active ^= 1
+	if (active == 0) {
+		GuiControl,, InputDisplay, SUSPENDED
+		Gui, Color, FF9900
+		clearBuffer()
+		IME_SET(1)
+	} else {
+		Gui, Color, eeeeee
+		UpdateDisplay()
+		IME_SET(0)
+	}
+return
+
+
 #IfWinActive
+
+
+#ifWinNotActive, ahk_group userenso
+^h::SendInput {BS}
+#IfWinActive
+
+;#ifWinNotActive, 名刺データ入力｜レゴエントリー
+;^Space::
+;	Suspend
+;	active ^= 1
+;	if (active == 0) {
+;		GuiControl,, InputDisplay, SUSPENDED
+;		Gui, Color, FF9900
+;		clearBuffer()
+;		IME_SET(1)
+;	} else {
+;		Gui, Color, eeeeee
+;		UpdateDisplay()
+;		IME_SET(0)
+;	}
+;return
+;
+;#ifWinNotActive
