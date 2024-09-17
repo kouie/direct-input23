@@ -71,7 +71,7 @@ LoadDictionary(fileName) {
 
 ; 情報ウィンドウを更新
 UpdateDisplay() {
-    GuiControl,, InputDisplay, d:%lastDispLength% b:%lastLength% F2:%lastFixKey2% F1:%lastFixKey% || %inputBuffer% 
+    GuiControl,, InputDisplay, m:%matchCount% d:%lastDispLength% b:%lastLength% F2:%lastFixKey2% F1:%lastFixKey% || %inputBuffer% 
 }
 
 ; 入力バッファの内容を変換
@@ -250,9 +250,9 @@ return
 		clearBuffer()
 	}
 
-	if (lastDispLength =< 0){
-		clearBuffer()
-	}
+;	if (lastDispLength <= 0){
+;		clearBuffer()
+;	}
 	UpdateDisplay()
 return
 
