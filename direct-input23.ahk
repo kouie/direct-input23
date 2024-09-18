@@ -10,6 +10,7 @@ GroupAdd, userenso, 氏名入力
 GroupAdd, userenso, データ入力 -
 GroupAdd, userenso, お仕事メニュー
 GroupAdd, userenso, 自宅で仕事
+GroupAdd, userenso, 漢字入力システムテスト
 
 global dictionaryFile := "dictionary.txt"
 global inputBuffer := ""
@@ -134,24 +135,26 @@ CheckAndConvert() {
 
 ; 直前の変換を対象に、区切り位置を(2文字目の後に)変更して再変換
 reConvert(){
-	if ( StrLen(lastFixKey) > 2 ) {
-		if (lastfixKey2 == SubStr(lastfixKey,1,2)) {
-			backup := inputBuffer
-			backcount := strLen(lastFixValue)+strLen(backup)
-			redopart := SubStr(lastFixKey,strLen(lastFixKey2)+1)
-			SendInput, {BS %backcount%}%lastFixValue2%%redopart%%backup%
-			lastFixKeyBackup := lastFixKey
-			lastFixKey2Backup := lastFixKey2
+	if (lastDispLength >=0){
+		if ( StrLen(lastFixKey) > 2 ) {
+			if (lastfixKey2 == SubStr(lastfixKey,1,2)) {
+				backup := inputBuffer
+				backcount := strLen(lastFixValue)+strLen(backup)
+				redopart := SubStr(lastFixKey,strLen(lastFixKey2)+1)
+				SendInput, {BS %backcount%}%lastFixValue2%%redopart%%backup%
+				lastFixKeyBackup := lastFixKey
+				lastFixKey2Backup := lastFixKey2
 
-			clearBuffer() 
-			inputBuffer := SubStr(lastFixKey,strLen(lastFixKey2)+1)
-			inputBUffer .= backup
-			CheckAndConvert()
-			if ( lastFixKey == lastFixKeyBackup ){
-					lastFixKey := lastFixKey2Backup
+				clearBuffer() 
+				inputBuffer := SubStr(lastFixKey,strLen(lastFixKey2)+1)
+				inputBUffer .= backup
+				CheckAndConvert()
+				if ( lastFixKey == lastFixKeyBackup ){
+						lastFixKey := lastFixKey2Backup
+				}
+				lastFixKey2 := lastFixKey2Backup
+				UpdateDisplay()
 			}
-			lastFixKey2 := lastFixKey2Backup
-			UpdateDisplay()
 		}
 	}
 }
