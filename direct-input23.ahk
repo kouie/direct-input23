@@ -755,8 +755,8 @@ return
 #IfWinActive
 
 ; 対象外のウィンドウの ^h
-;#ifWinNotActive, ahk_group directinput
-;^h::SendInput {BS}
-;#IfWinActive
+#ifWinNotActive, ahk_group directinput
+^h::SendInput {BS}
+#IfWinActive
 
 
