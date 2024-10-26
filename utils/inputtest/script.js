@@ -87,5 +87,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         generateNameSets(parseInt(setCountSelect.value));
     });
 
-    generateNameSets(5); // 初期表示
+    generateNameSets(30); // 初期表示
 });
