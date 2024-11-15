@@ -12,6 +12,7 @@ global dictionaryFile := ""
 global historyfile := ""
 global inputBuffer := ""
 global dictionary := {}
+global dictionaryKana := {}
 global matchCount := 0
 global lastLength := 0
 global lastDispLength := 0
@@ -35,6 +36,7 @@ global F1ConvMode := 16
 global F1SentenceMode := 0
 global imeStatus := 0
 global f1mode := 0
+global kanaDicFile := ""
 
 ; GUIの作成
 GUI_init() {
@@ -149,6 +151,7 @@ LoadInifile() {
 		IniRead, SentenceMode, %iniFile%, SentenceMode, mode
 		IniRead, F1ConvMode, %iniFile%, F1ConvMode, mode
 		IniRead, F1SentenceMode, %iniFile%, F1SentenceMode, mode
+		IniRead, kanaDicFile, %iniFile%, kanaDictionary, dict
   }
 
 ; INIファイルから前回終了時のセット番号を読み込む
@@ -214,6 +217,21 @@ LoadDictionary(set) {
     }
 }
 
+LoadDictionaryKana() {
+	FileRead, content, %kanaDicFile%
+	dictionaryKana := {}
+    Loop, Parse, content, `n, `r
+    {
+        if (A_LoopField = "")
+            continue
+        parts := StrSplit(A_LoopField, "=")
+        if (parts.Length() == 2)
+			kana := StrSplit(parts[2],",")
+            dictionaryKana[parts[1]] := {hira: kana[1], kata: kana[2]}
+    }
+}
+
+
 ; 情報ウィンドウを更新
 UpdateDisplay() {
 ;    GuiControl, 1:, InputDisplay, S:%CurrentSet% m:%matchCount% F2:%lastFixKey2% F1:%lastFixKey% || %inputBuffer% 
@@ -265,7 +283,7 @@ CheckAndConvert() {
 ;			historyBuffer := SubStr(historyBuffer, 1, -bsLength+1)	; +1 は変換前に画面に表示された分(引きすぎ)
 			historyBuffer := SubStr(historyBuffer, 1, -bsLength)	; 変換区切りのスペースを入れたので↑から -1
 			historyBuffer .= value . " "							; 区切りなしなら -bsLength+1 の方
-	    }else{
+		}else{
 	    	matchCount += 1
 	    	lastFixKey2 := lastFixKey
 	    	lastFixValue2 := lastFixValue
@@ -439,7 +457,9 @@ updateDictionary(){
 
     MsgBox, 辞書ファイルを更新しました
 
+	clearBuffer()
 	LoadDictionary(CurrentSet)
+	UpdateDisplay()
 ;	writeandreload()
 }
 
@@ -485,12 +505,61 @@ CreateGui() {
     Gui, 2:Show
 }
 
+; カナ変換本体
+;  文字列の先頭にあるアルファベット以外は無視する
+ConvertKana(targetBuffer, hiraKata){
+	head := RegExMatch(targetBuffer, "[a-zA-Z]")
+	workingBuffer := substr(targetBuffer, head)
+
+	kanaset := "hira"
+	if (hiraKata == 2){
+		kanaset := "kata"
+	} 
+	convertedKana := ""
+	part := ""
+	Loop, {
+		if (workingBuffer = "") {
+				break
+		} else {
+			partCounter := 1
+			Loop, {
+				if (partCounter > StrLen(workingBuffer) or workingBuffer = "") {
+					convertedKana .= substr(workingBuffer, 1, 1)
+					workingBuffer := substr(workingBuffer, 2)
+					break
+				}
+				part := substr(workingBuffer, 1, partCounter)
+				if (part)
+					kana := dictionaryKana[part][kanaset]
+				if  (kana != "") {
+					convertedKana .= kana
+					workingBuffer := substr(workingBuffer, partCounter+1 )
+					break
+				}
+				partCounter += 1
+			}
+		}
+	}
+	bslength := StrLen(targetBuffer)
+	SendInput, {BS %bslength%}
+	SendInput, %convertedKana%
+	clearbuffer()
+	UpdateDisplay()
+}
+
+; カナ変換 hiraKata=1: ひらがな or hiraKata=2: カタカナ
+kanaConvert(hiraKata){
+	target := inputBuffer
+	convertKana(target, hiraKata)
+}
+
 ; スクリプトの初期化時に ini ファイルを読み込む
 FileSets := LoadFileSets()
 CurrentSet := LoadCurrent()
 changefileset(CurrentSet)
 LoadDictionary(CurrentSet)
 LoadInifile()
+LoadDictionaryKana()
 
 GUI_init()
 UpdateDisplay()
@@ -536,14 +605,79 @@ $7::
 $8::
 $9::
 $.::
+$-::
 	key1 := SubStr(A_ThisHotkey, 2)
 	SendInput, %key1%
 	if (IME_GET() == 0){
-		inputBuffer .= SubStr(A_ThisHotkey, 2)
+;		inputBuffer .= SubStr(A_ThisHotkey, 2)
+		inputBuffer .= key1
 		UpdateDisplay()
 		CheckAndConvert()
 	}
 return
+
+$+a::
+$+b::
+$+c::
+$+d::
+$+e::
+$+f::
+$+g::
+$+h::
+$+i::
+$+j::
+$+k::
+$+l::
+$+m::
+$+n::
+$+o::
+$+p::
+$+q::
+$+r::
+$+s::
+$+t::
+$+u::
+$+v::
+$+w::
+$+x::
+$+y::
+$+z::
+	key1 := SubStr(A_ThisHotkey, 3)
+	StringUpper, key, key1
+	SendInput, %key%
+	inputBuffer .= key
+	UpdateDisplay()
+return
+
+$,::
+	key1 := SubStr(A_ThisHotkey, 2)
+
+	if (IME_GET() == 1){
+		SendInput, %key1%
+	}else{
+		if ( inputBuffer == "" or inputBuffer == lastfixKey){
+			clearBuffer()
+			SendInput, %key1%
+			inputBuffer .= key1
+		} else {
+			vpos := RegExMatch(inputBuffer, "[a-zA-Z0-9]")
+			if (vpos == 1){
+;				keys := Substr(inputBuffer, 1)
+				clearBuffer()
+				SendInput, %key1%
+				inputBuffer .= key1
+			} else {
+				keys := Substr(inputBuffer, 2)
+
+				bslength := StrLen(inputBuffer)
+				SendInput, {BS %bslength%}%keys%
+				clearBuffer()
+			}
+		} 
+	}
+	UpdateDisplay()
+return
+
 
 ; 直前の変換の区切り位置を変更
 ^k::
@@ -560,6 +694,7 @@ return
 	inputBuffer := SubStr(inputBuffer,1, -1)
 	lastDispLength -= 1
 	lastLength -= 1
+ 
 	if(rinputBuffer == lastFixKey){
 		clearBuffer()
 	}
@@ -568,12 +703,26 @@ return
 return
 
 ; 以下のキーでは入力バッファをクリア
+
 Enter::
 	SendInput, {Enter}
 	clearBuffer()
 	UpdateDisplay()
 	
 return
+
+vk1Dsc07B::
+	SendInput, {Left}
+	clearBuffer()
+	UpdateDisplay()
+Return
+
+vk1Csc079::
+	SendInput, {Right}
+	clearBuffer()
+	UpdateDisplay()
+Return
+
 
 Space::
 	SendInput, {Space}
@@ -743,6 +892,16 @@ Return
 	CreateGui()
 return
 
+; ひらがな変換
+!o::
+	kanaConvert(1)
+Return
+
+; カタカナ変換
+!i::
+	kanaConvert(2)
+Return
+
 ; ドロップダウンリストの選択変更時の処理
 SwitchSetFromGui:
     Gui, 2:Submit, NoHide
@@ -752,11 +911,13 @@ SwitchSetFromGui:
 	updateDisplay()
 return
 
+
+
 #IfWinActive
 
 ; 対象外のウィンドウの ^h
-;#ifWinNotActive, ahk_group directinput
-;^h::SendInput {BS}
-;#IfWinActive
+#ifWinNotActive, ahk_group directinput
+^h::SendInput {BS}
+#IfWinActive
 
 
