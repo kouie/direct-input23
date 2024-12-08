@@ -450,7 +450,7 @@ updateDictionary(){
 	FormatTime, timeString, , yyyyMMdd-HHmmss
 	parts := StrSplit(filepath, "\")
 	filename := parts[parts.length()]
-	backupFilename := timestring . "-" . filename
+	backupFilename := "dic_backup\" . timestring . "-" . filename
 	FileCopy, %filePath%, %backupFilename%
     FileDelete, %filePath%
     FileAppend, %newContent%, %filePath%, UTF-8
