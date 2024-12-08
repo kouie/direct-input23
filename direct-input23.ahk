@@ -553,6 +553,55 @@ kanaConvert(hiraKata){
 	convertKana(target, hiraKata)
 }
 
+; 先頭の数字を追い出して変換
+kickandConvert(){
+	head := RegExMatch(inputBuffer, "[a-z]")
+	targetBuffer := substr(inputBuffer, head)
+	bslength := StrLen(targetBuffer)
+	SendInput, {BS %bslength%}
+
+	clearBuffer()
+	Loop, Parse, targetBuffer
+	{
+		inputBuffer .= A_LoopField
+		SendInput, %A_LoopField%
+		CheckAndConvert()
+	}
+	UpdateDisplay()
+}
+
+; バッファの先頭 1 文字を追い出して変換
+shrinkandConvert(){
+	targetBuffer := substr(inputBuffer, 2)
+	bslength := StrLen(targetBuffer)
+	SendInput, {BS %bslength%}
+
+	clearBuffer()
+	Loop, Parse, targetBuffer
+	{
+		inputBuffer .= A_LoopField
+		SendInput, %A_LoopField%
+		CheckAndConvert()
+	}
+	UpdateDisplay()
+}
+
+; バッファの先頭 1 文字を削除して変換
+deleteandConvert(){
+	targetBuffer := substr(inputBuffer, 2)
+	bslength := StrLen(inputBuffer)
+	SendInput, {BS %bslength%}
+
+	clearBuffer()
+	Loop, Parse, targetBuffer
+	{
+		inputBuffer .= A_LoopField
+		SendInput, %A_LoopField%
+		CheckAndConvert()
+	}
+	UpdateDisplay()
+}
+
 ; スクリプトの初期化時に ini ファイルを読み込む
 FileSets := LoadFileSets()
 CurrentSet := LoadCurrent()
@@ -901,6 +950,19 @@ Return
 !i::
 	kanaConvert(2)
 Return
+
+!e::
+	kickandConvert()
+Return
+
+!s::
+	shrinkandConvert()
+Return
+
+!d::
+	deleteandConvert()
+Return
+
 
 ; ドロップダウンリストの選択変更時の処理
 SwitchSetFromGui:
