@@ -556,18 +556,20 @@ kanaConvert(hiraKata){
 ; 先頭の数字を追い出して変換
 kickandConvert(){
 	head := RegExMatch(inputBuffer, "[a-z]")
-	targetBuffer := substr(inputBuffer, head)
-	bslength := StrLen(targetBuffer)
-	SendInput, {BS %bslength%}
+	if (head > 1){
+		targetBuffer := substr(inputBuffer, head)
+		bslength := StrLen(targetBuffer)
+		SendInput, {BS %bslength%}
 
-	clearBuffer()
-	Loop, Parse, targetBuffer
-	{
-		inputBuffer .= A_LoopField
-		SendInput, %A_LoopField%
-		CheckAndConvert()
+		clearBuffer()
+		Loop, Parse, targetBuffer
+		{
+			inputBuffer .= A_LoopField
+			SendInput, %A_LoopField%
+			CheckAndConvert()
+		}
+		UpdateDisplay()
 	}
-	UpdateDisplay()
 }
 
 ; バッファの先頭 1 文字を追い出して変換
