@@ -762,19 +762,6 @@ Enter::
 	
 return
 
-vk1Dsc07B::
-	SendInput, {Left}
-	clearBuffer()
-	UpdateDisplay()
-Return
-
-vk1Csc079::
-	SendInput, {Right}
-	clearBuffer()
-	UpdateDisplay()
-Return
-
-
 Space::
 	SendInput, {Space}
 	clearBuffer()
@@ -975,12 +962,10 @@ SwitchSetFromGui:
 	updateDisplay()
 return
 
-
-
 #IfWinActive
 
 ; 対象外のウィンドウの ^h
-#ifWinNotActive, ahk_group directinput
-^h::SendInput {BS}
-#IfWinActive
+;#ifWinNotActive, ahk_group directinput
+;^h::SendInput {BS}
+;#IfWinActive
 
