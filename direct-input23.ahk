@@ -450,7 +450,7 @@ updateDictionary(){
 	FormatTime, timeString, , yyyyMMdd-HHmmss
 	parts := StrSplit(filepath, "\")
 	filename := parts[parts.length()]
-	backupFilename := timestring . "-" . filename
+	backupFilename := "dic_backup\" . timestring . "-" . filename
 	FileCopy, %filePath%, %backupFilename%
     FileDelete, %filePath%
     FileAppend, %newContent%, %filePath%, UTF-8
@@ -551,6 +551,57 @@ ConvertKana(targetBuffer, hiraKata){
 kanaConvert(hiraKata){
 	target := inputBuffer
 	convertKana(target, hiraKata)
+}
+
+; 先頭の数字を追い出して変換
+kickandConvert(){
+	head := RegExMatch(inputBuffer, "[a-z]")
+	if (head > 1){
+		targetBuffer := substr(inputBuffer, head)
+		bslength := StrLen(targetBuffer)
+		SendInput, {BS %bslength%}
+
+		clearBuffer()
+		Loop, Parse, targetBuffer
+		{
+			inputBuffer .= A_LoopField
+			SendInput, %A_LoopField%
+			CheckAndConvert()
+		}
+		UpdateDisplay()
+	}
+}
+
+; バッファの先頭 1 文字を追い出して変換
+shrinkandConvert(){
+	targetBuffer := substr(inputBuffer, 2)
+	bslength := StrLen(targetBuffer)
+	SendInput, {BS %bslength%}
+
+	clearBuffer()
+	Loop, Parse, targetBuffer
+	{
+		inputBuffer .= A_LoopField
+		SendInput, %A_LoopField%
+		CheckAndConvert()
+	}
+	UpdateDisplay()
+}
+
+; バッファの先頭 1 文字を削除して変換
+deleteandConvert(){
+	targetBuffer := substr(inputBuffer, 2)
+	bslength := StrLen(inputBuffer)
+	SendInput, {BS %bslength%}
+
+	clearBuffer()
+	Loop, Parse, targetBuffer
+	{
+		inputBuffer .= A_LoopField
+		SendInput, %A_LoopField%
+		CheckAndConvert()
+	}
+	UpdateDisplay()
 }
 
 ; スクリプトの初期化時に ini ファイルを読み込む
@@ -710,6 +761,19 @@ Enter::
 	UpdateDisplay()
 	
 return
+
+vk1Dsc07B::
+	SendInput, {Left}
+	clearBuffer()
+	UpdateDisplay()
+Return
+
+vk1Csc079::
+	SendInput, {Right}
+	clearBuffer()
+	UpdateDisplay()
+Return
+
 
 Space::
 	SendInput, {Space}
@@ -889,6 +953,19 @@ Return
 	kanaConvert(2)
 Return
 
+!e::
+	kickandConvert()
+Return
+
+!s::
+	shrinkandConvert()
+Return
+
+!d::
+	deleteandConvert()
+Return
+
+
 ; ドロップダウンリストの選択変更時の処理
 SwitchSetFromGui:
     Gui, 2:Submit, NoHide
@@ -898,11 +975,12 @@ SwitchSetFromGui:
 	updateDisplay()
 return
 
+
+
 #IfWinActive
 
 ; 対象外のウィンドウの ^h
-;#ifWinNotActive, ahk_group directinput
-;^h::SendInput {BS}
-;#IfWinActive
-
+#ifWinNotActive, ahk_group directinput
+^h::SendInput {BS}
+#IfWinActive
 
