@@ -405,4 +405,4 @@ set=1
 
 ## ライセンス
 
-このリポジトリの内容は [MT License](./LICENSE) です。
+このリポジトリの内容は [MIT License](./LICENSE) です。

@@ -234,8 +234,14 @@ LoadDictionaryKana() {
 
 ; 情報ウィンドウを更新
 UpdateDisplay() {
+;	Acc_Caret := Acc_ObjectFromWindow(WinExist("ahk_class Chrome_WidgetWin_1"), OBJID_CARET := 0xFFFFFFF8)
+;	Caret_Location := Acc_Location(Acc_Caret)
 ;    GuiControl, 1:, InputDisplay, S:%CurrentSet% m:%matchCount% F2:%lastFixKey2% F1:%lastFixKey% || %inputBuffer% 
     GuiControl, 1:, InputDisplay, ｾｯﾄ%CurrentSet% ﾏｴ[%lastFixKey%]  || %inputBuffer% 
+;    GuiControl, 1:, InputDisplay, %inputBuffer% || ｾｯﾄ%CurrentSet% ﾏｴ[%lastFixKey%]
+;	locx := Caret_Location.x 
+;	locy := Caret_Location.y + 30
+;	Gui, 1:Show, x%locx% y%locy% NoActivate
 }
 
 ; 履歴ファイルへの書き込み部分
@@ -615,6 +621,8 @@ LoadDictionaryKana()
 GUI_init()
 UpdateDisplay()
 
+;#include acc.ahk
+
 #IfWinActive, ahk_group directinput
 
 SetTimer, CheckHistory, %moniterTimer% ; 60 秒間隔でチェック
@@ -660,6 +668,7 @@ $-::
 	key1 := SubStr(A_ThisHotkey, 2)
 	SendInput, %key1%
 	if (IME_GET() == 0){
+;	if (IME_GET() < 2){
 ;		inputBuffer .= SubStr(A_ThisHotkey, 2)
 		inputBuffer .= key1
 		UpdateDisplay()
@@ -737,7 +746,7 @@ return
 return
 
 ; 入力バッファから 1 文字削除 (画面内の未確定も同期)
-^h::
+^$h::
 	Suspend, Permit
 
 	SendInput, {BS}
@@ -755,14 +764,27 @@ return
 
 ; 以下のキーでは入力バッファをクリア
 
-Enter::
+$Enter::
 	SendInput, {Enter}
 	clearBuffer()
 	UpdateDisplay()
 	
 return
 
-Space::
+vk1Dsc07B::
+	SendInput, {Left}
+	clearBuffer()
+	UpdateDisplay()
+Return
+
+vk1Csc079::
+	SendInput, {Right}
+	clearBuffer()
+	UpdateDisplay()
+Return
+
+
+$Space::
 	SendInput, {Space}
 	clearBuffer()
 	UpdateDisplay()
@@ -773,13 +795,13 @@ return
 	UpdateDisplay()
 return
 
-Tab::
+$Tab::
 	SendInput, {Tab}
 	clearBuffer()
 	UpdateDisplay()
 return
 
-+Tab::
++$Tab::
 	SendInput, +{Tab}
 	clearBuffer()
 	UpdateDisplay()
@@ -803,6 +825,10 @@ return
 ; [半角/全角] キー
 vkF4sc029::
 ;	SendInput, {vkF4sc029}
+	ime_real_state := IME_GET()
+	if (ime_real_state != imeStatus){
+		imeStatus := ime_real_state
+	}
 	if (imeStatus == 0){
 		Gui, 1:Color, C0C000
 		IME_SET(1)
@@ -814,12 +840,17 @@ vkF4sc029::
 	}
 	imeStatus ^= 1
 	f1mode := 0
+	clearBuffer()
 	UpdateDisplay()
 return
 
 ; [半角/全角] キー
 vkF3sc029::
 ;	SendInput, {vkF3sc029}
+	ime_real_state := IME_GET()
+	if (ime_real_state != imeStatus){
+		imeStatus := ime_real_state
+	}
 	if (imeStatus == 0){
 		Gui, 1:Color, C0C000
 		IME_SET(1)
@@ -831,11 +862,13 @@ vkF3sc029::
 	}
 	imeStatus ^= 1
 	f1mode := 0
+	clearBuffer()
 	UpdateDisplay()
 return
 
 ; IME 入力モード固定
 F1::
+F5::
 ;	SendInput, {vkF3sc029}
 	if (f1mode == 0){
 		Gui, 1:Color, 40C0C0
@@ -843,8 +876,10 @@ F1::
 		IME_SetConvMode(F1ConvMode) 
 		IME_SetSentenceMode(F1SentenceMode)
 	}
+	SendInput, ^{F9}s	;personal
 	f1mode := 1
 	imeStatus := 1
+	clearBuffer()
 	UpdateDisplay()
 return
 
@@ -965,7 +1000,7 @@ return
 #IfWinActive
 
 ; 対象外のウィンドウの ^h
-;#ifWinNotActive, ahk_group directinput
-;^h::SendInput {BS}
-;#IfWinActive
+#ifWinNotActive, ahk_group directinput
+^$h::SendInput {BS}
+#IfWinActive
 
