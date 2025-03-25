@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>漢字入力システムデモ</title>
+    <style>
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'メイリオ', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .container {
+            margin-top: 20px;
+        }
+        .input-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .target-display {
+            font-size: 24px;
+            margin-bottom: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            background-color: #fff;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .target-display .reading {
+            font-size: 16px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .input-area {
+            margin-bottom: 20px;
+        }
+        .input-display {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin-bottom: 10px;
+            min-height: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button.secondary {
+            background-color: #5c6bc0;
+        }
+        button.secondary:hover {
+            background-color: #3f51b5;
+        }
+        button.danger {
+            background-color: #f44336;
+        }
+        button.danger:hover {
+            background-color: #d32f2f;
+        }
+        button.toggle-button.suspended {
+            background-color: #FF9900;
+        }
+        .settings {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f5e9;
+            border-radius: 6px;
+        }
+        .settings-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .setting-group {
+            margin-bottom: 15px;
+        }
+        .shortcuts {
+            background-color: #e3f2fd;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .shortcuts h3 {
+            margin-top: 0;
+            font-size: 16px;
+        }
+        .shortcuts ul {
+            columns: 2;
+            margin: 0;
+            padding-left: 20px;
+        }
+        .dictionary-upload {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+        .tab-group {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #fff;
+            border-bottom-color: #fff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>漢字入力システムデモ</h1>
+    
+    <div class="container">
+        <div class="tab-group">
+            <div class="tab active" data-target="names-kanji">姓名（漢字）</div>
+            <div class="tab" data-target="names-katakana">姓名（カタカナ）</div>
+            <div class="tab" data-target="addresses">住所</div>
+        </div>
+        
+        <div class="input-section">
+            <div class="target-display">
+                <div id="targetText">入力対象がここに表示されます</div>
+                <div class="reading" id="targetReading">読みがここに表示されます</div>
+            </div>
+            
+            <div class="input-area">
+                <div class="input-display" id="inputDisplay">入力状態: 待機中</div>
+                <textarea id="inputField" placeholder="ここに入力してください..."></textarea>
+            </div>
+            
+            <div class="button-group">
+                <button id="nextTarget" class="secondary">更新 (F5)</button>
+                <button id="clearInput" class="danger">クリア (Esc)</button>
+                <button id="toggleSystem" class="toggle-button">システム停止/再開 (Ctrl+Q)</button>
+            </div>
+        </div>
+        
+        <div class="shortcuts">
+            <h3>ショートカットキー</h3>
+            <ul>
+                <li><strong>F5</strong>: 次の入力対象を表示</li>
+                <li><strong>Esc</strong>: 入力欄をクリア</li>
+                <li><strong>Ctrl+Q</strong>: システム停止/再開</li>
+                <li><strong>Ctrl+L / Ctrl+K</strong>: 再変換</li>
+                <li><strong>Backspace</strong>: 1文字削除</li>
+                <li><strong>Ctrl+H</strong>: 1文字削除 (代替)</li>
+            </ul>
+        </div>
+        
+        <div class="settings">
+            <div class="settings-title">設定</div>
+            
+            <div class="setting-group">
+                <label for="dictionaryType">辞書タイプ: </label>
+                <select id="dictionaryType">
+                    <option value="kanji">漢字辞書</option>
+                    <option value="katakana">カタカナ辞書</option>
+                </select>
+            </div>
+            
+            <div class="dictionary-upload">
+                <p>独自の辞書ファイルを読み込む (形式: 読み=漢字 の行ごとのテキスト)</p>
+                <input type="file" id="dictionaryFile" accept=".txt">
+                <button id="loadDictionary" class="secondary">辞書を読み込む</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // グローバル変数
+        let inputBuffer = "";       // 変換用バッファ
+        let dictionaries = {        // 辞書セット
+            "kanji": {},            // 漢字辞書
+            "katakana": {}          // カタカナ辞書
+        };
+        let currentDictionary = "kanji";  // 現在使用中の辞書タイプ
+        let dictionary = {};        // 現在使用中の辞書
+        let matchCount = 0;         // マッチカウント
+        let lastFixKey = "";        // 最後に変換したキー
+        let lastFixKey2 = "";       // 一つ前に変換したキー
+        let reConAble = 0;          // 再変換可能フラグ
+        let isActive = true;        // システム有効/無効フラグ
+        let isBackspacePressed = false; // バックスペース検出フラグ
+        
+        // 入力対象データ
+        let targetData = {
+            "names-kanji": [
+                { text: "田中 京子", kana: "タナカ キョウコ" },
+                { text: "佐藤 健太", kana: "サトウ ケンタ" },
+                { text: "鈴木 花子", kana: "スズキ ハナコ" },
+                { text: "高橋 誠", kana: "タカハシ マコト" },
+                { text: "渡辺 直美", kana: "ワタナベ ナオミ" },
+                { text: "伊藤 剛", kana: "イトウ ツヨシ" },
+                { text: "山本 裕子", kana: "ヤマモト ユウコ" },
+                { text: "中村 大輔", kana: "ナカムラ ダイスケ" },
+                { text: "小林 美咲", kana: "コバヤシ ミサキ" },
+                { text: "加藤 浩二", kana: "カトウ コウジ" }
+            ],
+            "names-katakana": [
+                { text: "タナカ イチロウ", kana: "田中 一郎" },
+                { text: "サトウ ケンタ", kana: "佐藤 健太" },
+                { text: "スズキ ハナコ", kana: "鈴木 花子" },
+                { text: "タカハシ マコト", kana: "高橋 誠" },
+                { text: "ワタナベ ナオミ", kana: "渡辺 直美" },
+                { text: "イトウ ツヨシ", kana: "伊藤 剛" },
+                { text: "ヤマモト ユウコ", kana: "山本 裕子" },
+                { text: "ナカムラ ダイスケ", kana: "中村 大輔" },
+                { text: "コバヤシ ミサキ", kana: "小林 美咲" },
+                { text: "カトウ コウジ", kana: "加藤 浩二" }
+            ],
+            "addresses": [
+                { text: "東京都新宿区", kana: "トウキョウト シンジュクク" },
+                { text: "大阪府大阪市", kana: "オオサカフ オオサカシ" },
+                { text: "京都府京都市", kana: "キョウトフ キョウトシ" },
+                { text: "北海道札幌市", kana: "ホッカイドウ サッポロシ" },
+                { text: "福岡県博多区", kana: "フクオカケン ハカタク" },
+                { text: "愛知県名古屋市", kana: "アイチケン ナゴヤシ" },
+                { text: "神奈川県横浜市", kana: "カナガワケン ヨコハマシ" },
+                { text: "広島県広島市", kana: "ヒロシマケン ヒロシマシ" },
+                { text: "宮城県仙台市", kana: "ミヤギケン センダイシ" },
+                { text: "兵庫県神戸市", kana: "ヒョウゴケン コウベシ" }
+            ]
+        };
+        
+        // 現在のターゲットデータセット
+        let currentDataSet = "names-kanji";
+        // 現在の入力対象インデックス
+        let currentTargetIndex = 0;
+        // 現在の入力対象
+        let currentTarget = null;
+        // 入力済みの読み単位（インデックス）
+        let completedReadings = [];
+        // 現在の入力対象の読み単位の配列
+        let currentTargetReadings = [];
+
+        // DOM要素
+        const inputField = document.getElementById('inputField');
+        const inputDisplay = document.getElementById('inputDisplay');
+        const toggleButton = document.getElementById('toggleSystem');
+        const nextTargetButton = document.getElementById('nextTarget');
+        const clearInputButton = document.getElementById('clearInput');
+        const targetTextElement = document.getElementById('targetText');
+        const targetReadingElement = document.getElementById('targetReading');
+        const dictionaryTypeSelect = document.getElementById('dictionaryType');
+        const dictionaryFileInput = document.getElementById('dictionaryFile');
+        const loadDictionaryButton = document.getElementById('loadDictionary');
+        const tabs = document.querySelectorAll('.tab');
+
+        // サンプル漢字辞書データ
+        const sampleKanjiDictionary = {
+            // 単漢字
+            "tn": "田", "nk": "中", "it": "一", "rj": "郎",
+            "sl": "佐", "fj": "藤", "kn": "健", "df": "太",
+            "b88": "鈴", "wt": "渡", "bb": "美", "dd": "大",
+            "kf": "花", "vv": "子", "tt": "高", "kx": "小",
+            // 複合
+            "tan": "田中", "ir": "一郎", "sp": "佐藤", 
+            "b8": "鈴木", "kfv": "花子", "th": "高橋", "kob": "小林",
+            // 住所
+            "tky": "東京", "osk": "大阪", "kyt": "京都", "hkd": "北海道",
+            "fk": "福岡", "ai": "愛知", "kng": "神奈川", "hrs": "広島",
+            "mg": "宮城", "hg": "兵庫", "sjk": "新宿", "hkt": "博多",
+            "spr": "札幌", "ngy": "名古屋", "yhm": "横浜", "snd": "仙台",
+            "kb": "神戸"
+        };
+
+        // サンプルカタカナ辞書データ
+        const sampleKatakanaDictionary = {
+            "tn": "タナカ", "ir": "イチロウ", "st": "サトウ", "kt": "ケンタ",
+            "szk": "スズキ", "hk": "ハナコ", "tkhs": "タカハシ", "mt": "マコト",
+            "wtb": "ワタナベ", "nm": "ナオミ", "it": "イトウ", "ts": "ツヨシ",
+            "ymt": "ヤマモト", "yk": "ユウコ", "nkm": "ナカムラ", "ds": "ダイスケ",
+            "kby": "コバヤシ", "msk": "ミサキ", "kto": "カトウ", "kj": "コウジ",
+            "tky": "トウキョウト", "snjk": "シンジュクク", "osk": "オオサカ", 
+            "kyt": "キョウト", "hkd": "ホッカイドウ", "spr": "サッポロ",
+            "fk": "フクオカ", "hkt": "ハカタ", "ai": "アイチ", "ngy": "ナゴヤ",
+            "kng": "カナガワ", "ykh": "ヨコハマ", "hrs": "ヒロシマ", 
+            "mg": "ミヤギ", "snd": "センダイ", "hg": "ヒョウゴ", "kb": "コウベ"
+        };
+
+        // 辞書の初期化
+        function initDictionaries() {
+            dictionaries.kanji = sampleKanjiDictionary;
+            dictionaries.katakana = sampleKatakanaDictionary;
+            dictionary = dictionaries[currentDictionary];
+        }
+
+        // 辞書タイプの切り替え
+        function switchDictionary(type) {
+            currentDictionary = type;
+            dictionary = dictionaries[type];
+            dictionaryTypeSelect.value = type;
+            clearBuffer();
+            updateDisplay();
+        }
+
+        // データセットの切り替え
+        function switchDataSet(dataSet) {
+            currentDataSet = dataSet;
+            currentTargetIndex = 0;
+            completedChars = [];
+            
+            // データセットに応じて辞書を切り替え
+            if (dataSet === "names-katakana") {
+                switchDictionary("katakana");
+            } else {
+                switchDictionary("kanji");
+            }
+            
+            // タブのアクティブ状態を更新
+            tabs.forEach(tab => {
+                if (tab.dataset.target === dataSet) {
+                    tab.classList.add('active');
+                } else {
+                    tab.classList.remove('active');
+                }
+            });
+            
+            showNextTarget();
+        }
+
+        // 入力対象テキストから読みを最長マッチで生成
+        function generateReading(text) {
+            const cleanText = text.replace(/\s+/g, '');
+            const readings = [];
+            
+            let remainingText = cleanText;
+            let startIndex = 0;
+            
+            while (remainingText.length > 0) {
+                let bestMatch = '';
+                let bestMatchLength = 0;
+                let bestValue = '';
+                
+                // 辞書を走査して最長マッチを探す
+                for (const [key, value] of Object.entries(dictionary)) {
+                    if (remainingText.startsWith(value) && value.length > bestMatchLength) {
+                        bestMatch = key;
+                        bestMatchLength = value.length;
+                        bestValue = value;
+                    }
+                }
+                
+                if (bestMatch) {
+                    // 最長マッチが見つかった
+                    readings.push({
+                        reading: bestMatch,
+                        value: bestValue,
+                        completed: false
+                    });
+                    remainingText = remainingText.slice(bestMatchLength);
+                    startIndex += bestMatchLength;
+                } else {
+                    // マッチが見つからない場合は1文字進める
+                    readings.push({
+                        reading: remainingText.charAt(0),
+                        value: remainingText.charAt(0),
+                        completed: false
+                    });
+                    remainingText = remainingText.slice(1);
+                    startIndex += 1;
+                }
+            }
+            
+            return readings;
+        }
+ 
+        // 読み単位を解析して表示用データを作成
+        function analyzeTargetReadings() {
+            if (!currentTarget) return;
+            
+            currentTargetReadings = generateReading(currentTarget.text);
+            updateTargetDisplay();
+        }
+        
+        // 入力対象の表示を更新（色分け含む）
+        function updateTargetDisplay() {
+            if (!currentTarget || !currentTargetReadings.length) return;
+            
+            // 漢字テキスト（色分け）
+            let textHtml = '';
+            for (let i = 0; i < currentTargetReadings.length; i++) {
+                const item = currentTargetReadings[i];
+                if (completedReadings.includes(i)) {
+                    textHtml += `<span style="color: #4CAF50;">${item.value}</span>`;
+                } else {
+                    textHtml += `<span>${item.value}</span>`;
+                }
+                // スペースを保持
+                if (i < currentTargetReadings.length - 1 && 
+                    (currentTarget.text.indexOf(' ') !== -1) && 
+                    (textHtml.length === currentTarget.text.indexOf(' '))) {
+                    textHtml += ' ';
+                }
+            }
+            
+            // 読みテキスト（色分け）
+            let readingHtml = '';
+            for (let i = 0; i < currentTargetReadings.length; i++) {
+                const item = currentTargetReadings[i];
+                if (completedReadings.includes(i)) {
+                    readingHtml += `<span style="color: #4CAF50;">${item.reading}</span>`;
+                } else {
+                    readingHtml += `<span>${item.reading}</span>`;
+                }
+                if (i < currentTargetReadings.length - 1) {
+                    readingHtml += ' ';
+                }
+            }
+            
+            targetTextElement.innerHTML = textHtml;
+            targetReadingElement.innerHTML = readingHtml;
+        }
+
+        // 次の入力対象を表示
+        function showNextTarget() {
+            const targets = targetData[currentDataSet];
+            if (targets.length === 0) return;
+            
+            currentTarget = targets[currentTargetIndex];
+            targetTextElement.textContent = currentTarget.text;
+            
+            // 読みを解析して表示を更新
+//            analyzeTargetReadings();
+            
+            // 入力済み読みをリセット
+            completedReadings = [];
+            // 現在の入力対象の読み単位を解析
+            analyzeTargetReadings();
+            
+            // 入力欄をクリア
+            inputField.value = '';
+            clearBuffer();
+            updateDisplay();
+        }
+
+        // 次の入力対象に進む
+        function goToNextTarget() {
+            currentTargetIndex = (currentTargetIndex + 1) % targetData[currentDataSet].length;
+            showNextTarget();
+        }
+
+        // 入力表示の更新
+        function updateDisplay() {
+            inputDisplay.textContent = `再変換:${reConAble} マッチ:${matchCount} | 前回:${lastFixKey} - 現在:${inputBuffer}`;
+        }
+
+        // バッファのクリア
+        function clearBuffer() {
+            inputBuffer = "";
+            matchCount = 0;
+            reConAble = 0;
+        }
+
+        // 入力欄のクリア
+        function clearInputField() {
+            inputField.value = '';
+            clearBuffer();
+            updateDisplay();
+        }
+
+        // 入力バッファの内容を変換
+        function checkAndConvert() {
+            if (inputBuffer.length === 1) {
+                return;
+            }
+            
+            const value = dictionary[inputBuffer];
+            const key = inputBuffer;
+            
+            if (value) {
+
+                var bslength;
+                if (matchCount === 0){
+                    bslength = key.length;
+                } else {
+                    bslength = key.length - lastFixKey.length + dictionary[lastFixKey].length;
+                }
+                
+                // 変換前のテキストエリアの状態を保存
+                const cursorPos = inputField.selectionStart;
+//                const textBefore = inputField.value.substring(0, cursorPos - key.length);
+                const textBefore = inputField.value.substring(0, cursorPos - bslength);                
+                const textAfter = inputField.value.substring(cursorPos);
+                
+                // 変換を適用
+                inputField.value = textBefore + value + textAfter;
+                
+                // カーソル位置の調整
+                const newPosition = textBefore.length + value.length;
+                inputField.setSelectionRange(newPosition, newPosition);
+                
+                // 入力対象の文字が入力されたかチェック
+                checkCompletedChars(value);
+                
+                // バッファと変換履歴を更新
+                reConAble = 0;
+                if (matchCount > 0) {
+                    // 再マッチ時 (3 文字)
+                    inputBuffer = "";
+                    matchCount = 0;
+                    reConAble = 1;
+                } else {
+                    // 初回マッチ (2 or 3 文字)
+                    matchCount += 1;
+                }
+                lastFixKey2 = lastFixKey;
+                lastFixKey = key;
+            } else {
+                if (matchCount === 1) {
+                    // 3 文字のマッチなし、最後の 1 文字残してバッファをクリア
+                    inputBuffer = inputBuffer.charAt(inputBuffer.length - 1);
+                    matchCount = 0;
+                }
+            }
+            updateDisplay();
+        }
+
+        // 入力された漢字が入力対象の順序に一致するかチェック
+        function checkCompletedChars(value) {
+            if (!currentTarget || !currentTargetReadings.length) return;
+            
+            // 次に入力されるべき読みのインデックス
+            const nextReadingIndex = completedReadings.length;
+            if (nextReadingIndex >= currentTargetReadings.length) return;
+            
+            // 次に期待される読みに対応する値
+            const expectedReading = currentTargetReadings[nextReadingIndex];
+            
+            // 入力値が期待される値と一致するか
+            if (value === expectedReading.value) {
+                // 一致した場合は完了済みリストに追加
+                completedReadings.push(nextReadingIndex);
+                updateTargetDisplay();
+                
+                // すべての読みが入力されたかチェック
+                if (completedReadings.length === currentTargetReadings.length) {
+                    setTimeout(() => {
+                        alert("入力完了！次の問題に進みます。");
+                        goToNextTarget();
+                    }, 500);
+                }
+            }
+        }
+
+        // バックスペース処理
+        function backspaceBuffer() {
+            if (inputBuffer === lastFixKey) {  // 変換直後
+                clearBuffer();
+            } else if (inputBuffer === "") {
+                clearBuffer();
+            } else {
+                inputBuffer = inputBuffer.substring(0, inputBuffer.length - 1);
+                if (inputBuffer === "") {
+                    if (reConAble === 1) {
+                        clearBuffer();
+                        reConAble = 1;
+                    } else {
+                        clearBuffer();
+                    }
+                }
+            }
+            updateDisplay();
+        }
+
+        // 再変換処理
+        function reConvert() {
+            if (reConAble === 1) {
+                const followPart = inputBuffer;
+                const redoPart = lastFixKey.substring(lastFixKey2.length);
+                const lastFixValue = dictionary[lastFixKey];
+                const lastFixValue2 = dictionary[lastFixKey2];
+                
+                // 現在のカーソル位置を取得
+                const cursorPos = inputField.selectionStart;
+                const textBefore = inputField.value.substring(0, cursorPos - lastFixValue.length - followPart.length);
+                const textAfter = inputField.value.substring(cursorPos);
+                
+                // 変換前の状態に戻す
+                inputField.value = textBefore + lastFixValue2 + redoPart + followPart + textAfter;
+                
+                // カーソル位置の調整
+                const newPosition = textBefore.length + lastFixValue2.length + redoPart.length + followPart.length;
+                inputField.setSelectionRange(newPosition, newPosition);
+
+//                checkCompletedChars(lastFixValue2)
+
+                // 変換履歴を一時保存
+                const lastFixKeyBackup = lastFixKey;
+                const lastFixKey2Backup = lastFixKey2;
+                clearBuffer();
+                
+                // 入力バッファを更新して変換
+                inputBuffer = redoPart + followPart;
+                checkAndConvert();
+                
+                // 変換履歴を更新
+                if (lastFixKey === lastFixKeyBackup) {
+                    lastFixKey = lastFixKey2Backup; // 後続の変換なし
+                }
+                lastFixKey2 = lastFixKey2Backup;
+                reConAble = 0;
+                
+                updateDisplay();
+            }
+        }
+
+        // システムの一時停止/再開
+        function toggleSystem() {
+            isActive = !isActive;
+            if (!isActive) {
+                clearBuffer();
+                inputDisplay.textContent = "システム停止中";
+                inputDisplay.style.backgroundColor = "#FF9900";
+                toggleButton.classList.add('suspended');
+            } else {
+                inputDisplay.style.backgroundColor = "#f5f5f5";
+                toggleButton.classList.remove('suspended');
+                updateDisplay();
+            }
+        }
+
+        // 外部辞書ファイルを読み込む
+        function loadExternalDictionary() {
+            const file = dictionaryFileInput.files[0];
+            if (!file) {
+                alert("ファイルを選択してください。");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const customDictionary = {};
+                
+                // 行ごとに処理
+                content.split('\n').forEach(line => {
+                    if (!line.trim()) return;
+                    const [key, value] = line.split('=');
+                    if (key && value) {
+                        customDictionary[key.trim()] = value.trim();
+                    }
+                });
+                
+                // 既存の辞書をマージまたは置き換え
+                const dictType = dictionaryTypeSelect.value;
+                if (Object.keys(customDictionary).length > 0) {
+                    dictionaries[dictType] = customDictionary;
+                    dictionary = dictionaries[dictType];
+                    alert(`${Object.keys(customDictionary).length}件の辞書エントリを読み込みました。`);
+                    analyzeTargetReadings()
+                    updateDisplay();
+                } else {
+                    alert("有効な辞書エントリが見つかりませんでした。");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // キー入力イベント
+        inputField.addEventListener('keydown', function(e) {
+            if (!isActive) {
+                // システム停止中は特殊キーのみ処理
+                if ((e.ctrlKey && e.key === 'q') || (e.altKey && e.key === 'F12')) {
+                    toggleSystem();
+                    e.preventDefault();
+                }
+                return;
+            }
+            
+            // 特殊キー処理
+            if (e.key === 'Backspace') {
+                isBackspacePressed = true;
+                backspaceBuffer();
+                return;
+            } else if (e.ctrlKey && (e.key === 'h')) {
+                isBackspacePressed = true;
+                backspaceBuffer();
+                e.preventDefault();
+                return;
+            } else if (e.ctrlKey && (e.key === 'k' || e.key === 'l')) {
+                reConvert();
+                e.preventDefault();
+                return;
+            } else if ((e.ctrlKey && e.key === 'q') || (e.altKey && e.key === 'F12')) {
+                toggleSystem();
+                e.preventDefault();
+                return;
+            } else if (e.key === 'Escape') {
+                clearInputField();
+                e.preventDefault();
+                return;
+            } else if (e.key === 'F5') {
+                goToNextTarget();
+                e.preventDefault();
+                return;
+            } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Tab' ||
+                       e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                clearBuffer();
+                updateDisplay();
+                return;
+            }
+            
+            // 通常の入力処理は input イベントで行う
+        });
+        
+        // バックスペースのキーアップでフラグをリセット
+        inputField.addEventListener('keyup', function(e) {
+            if (e.key === 'Backspace' || (e.ctrlKey && e.key === 'h')) {
+                setTimeout(() => {
+                    isBackspacePressed = false;
+                }, 10);
+            }
+        });
+
+        // テキスト入力イベント
+        inputField.addEventListener('input', function(e) {
+            if (!isActive) return;
+            
+            // バックスペースキーが押されている場合は処理しない
+            if (isBackspacePressed) {
+                return;
+            }
+            
+            // 最後に入力された文字を取得
+            const lastChar = inputField.value.charAt(inputField.selectionStart - 1);
+            
+            // 入力文字が有効な場合のみバッファに追加
+            if (lastChar && /[a-z0-9.\-@]/.test(lastChar)) {
+                inputBuffer += lastChar;
+                updateDisplay();
+                checkAndConvert();
+            }
+        });
+
+        // 更新ボタンのクリックイベント
+        nextTargetButton.addEventListener('click', goToNextTarget);
+
+        // クリアボタンのクリックイベント
+        clearInputButton.addEventListener('click', clearInputField);
+
+        // トグルボタンのクリックイベント
+        toggleButton.addEventListener('click', toggleSystem);
+
+        // 辞書読み込みボタンのクリックイベント
+        loadDictionaryButton.addEventListener('click', loadExternalDictionary);
+
+        // 辞書タイプ変更イベント
+        dictionaryTypeSelect.addEventListener('change', function() {
+            switchDictionary(this.value);
+        });
+
+        // タブ切り替えイベント
+        tabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                switchDataSet(this.dataset.target);
+            });
+        });
+
+        // 初期化
+        initDictionaries();
+        showNextTarget();
+        updateDisplay();
+    </script>
+</body>
+</html>
+        
