@@ -67,7 +67,7 @@
             margin-bottom: 15px;
         }
         button {
-            background-color: #4CAF50;
+            background-color: #589147;
             color: white;
             padding: 8px 16px;
             border: none;
@@ -76,7 +76,7 @@
             transition: background-color 0.3s;
         }
         button:hover {
-            background-color: #45a049;
+            background-color: #28702b;
         }
         button.secondary {
             background-color: #5c6bc0;
@@ -85,10 +85,10 @@
             background-color: #3f51b5;
         }
         button.danger {
-            background-color: #f44336;
+            background-color: #a76d69;
         }
         button.danger:hover {
-            background-color: #d32f2f;
+            background-color: #914646;
         }
         button.toggle-button.suspended {
             background-color: #FF9900;
@@ -155,7 +155,7 @@
         <div class="tab-group">
             <div class="tab active" data-target="names-kanji">姓名（漢字）</div>
             <div class="tab" data-target="names-katakana">姓名（カタカナ）</div>
-            <div class="tab" data-target="addresses">住所</div>
+<!---            <div class="tab" data-target="addresses">住所</div> -->
         </div>
         
         <div class="input-section">
@@ -226,6 +226,7 @@
         // 入力対象データ
         let targetData = {
             "names-kanji": [
+                { text: "長谷川 今日子", kana: "ハセガワ キョウコ" },
                 { text: "田中 京子", kana: "タナカ キョウコ" },
                 { text: "佐藤 健太", kana: "サトウ ケンタ" },
                 { text: "鈴木 花子", kana: "スズキ ハナコ" },
@@ -262,6 +263,12 @@
                 { text: "兵庫県神戸市", kana: "ヒョウゴケン コウベシ" }
             ]
         };
+
+        let dictionaryForDataset = {
+            "names-kanji": "kanji",
+            "names-katakana": "katakana",
+            "addresses": "kanji"
+        };
         
         // 現在のターゲットデータセット
         let currentDataSet = "names-kanji";
@@ -271,6 +278,7 @@
         let currentTarget = null;
         // 入力済みの読み単位（インデックス）
         let completedReadings = [];
+        let completedIndex = 0;
         // 現在の入力対象の読み単位の配列
         let currentTargetReadings = [];
 
@@ -294,9 +302,11 @@
             "sl": "佐", "fj": "藤", "kn": "健", "df": "太",
             "b88": "鈴", "wt": "渡", "bb": "美", "dd": "大",
             "kf": "花", "vv": "子", "tt": "高", "kx": "小",
+            "ng": "長", "tv": "谷", "kw": "川",
             // 複合
             "tan": "田中", "ir": "一郎", "sp": "佐藤", 
             "b8": "鈴木", "kfv": "花子", "th": "高橋", "kob": "小林",
+            "has":"長谷", "tak": "谷川",
             // 住所
             "tky": "東京", "osk": "大阪", "kyt": "京都", "hkd": "北海道",
             "fk": "福岡", "ai": "愛知", "kng": "神奈川", "hrs": "広島",
@@ -308,11 +318,11 @@
         // サンプルカタカナ辞書データ
         const sampleKatakanaDictionary = {
             "tn": "タナカ", "ir": "イチロウ", "st": "サトウ", "kt": "ケンタ",
-            "szk": "スズキ", "hk": "ハナコ", "tkhs": "タカハシ", "mt": "マコト",
+            "szk": "スズキ", "hk": "ハナコ", "tah": "タカハシ", "mt": "マコト",
             "wtb": "ワタナベ", "nm": "ナオミ", "it": "イトウ", "ts": "ツヨシ",
             "ymt": "ヤマモト", "yk": "ユウコ", "nkm": "ナカムラ", "ds": "ダイスケ",
             "kby": "コバヤシ", "msk": "ミサキ", "kto": "カトウ", "kj": "コウジ",
-            "tky": "トウキョウト", "snjk": "シンジュクク", "osk": "オオサカ", 
+            "tky": "トウキョウト", "sjk": "シンジュクク", "osk": "オオサカ", 
             "kyt": "キョウト", "hkd": "ホッカイドウ", "spr": "サッポロ",
             "fk": "フクオカ", "hkt": "ハカタ", "ai": "アイチ", "ngy": "ナゴヤ",
             "kng": "カナガワ", "ykh": "ヨコハマ", "hrs": "ヒロシマ", 
@@ -329,10 +339,14 @@
         // 辞書タイプの切り替え
         function switchDictionary(type) {
             currentDictionary = type;
+
+            dictionaryForDataset[currentDataSet] = type
+
             dictionary = dictionaries[type];
             dictionaryTypeSelect.value = type;
             clearBuffer();
             updateDisplay();
+            showNextTarget();
         }
 
         // データセットの切り替え
@@ -342,12 +356,15 @@
             completedChars = [];
             
             // データセットに応じて辞書を切り替え
-            if (dataSet === "names-katakana") {
-                switchDictionary("katakana");
-            } else {
-                switchDictionary("kanji");
-            }
+//            if (dataSet === "names-katakana") {
+//                switchDictionary("katakana");
+//            } else {
+//                switchDictionary("kanji");
+//            }
             
+            dictlabel = dictionaryForDataset[dataSet]
+            switchDictionary(dictlabel)
+
             // タブのアクティブ状態を更新
             tabs.forEach(tab => {
                 if (tab.dataset.target === dataSet) {
@@ -361,7 +378,7 @@
         }
 
         // 入力対象テキストから読みを最長マッチで生成
-        function generateReading(text) {
+        function generateReading_org(text) {
             const cleanText = text.replace(/\s+/g, '');
             const readings = [];
             
@@ -406,6 +423,102 @@
             return readings;
         }
  
+
+
+        // 動的計画法を使用して入力対象テキストからすべての可能な読みパターンを生成する関数
+        function generateReading(text) {
+            const cleanText = text.replace(/\s+/g, '');
+            const n = cleanText.length;
+            
+            // dp[i] = テキストの位置iまでの可能なすべての区切り方
+            const dp = new Array(n + 1).fill().map(() => []);
+            dp[0] = [[]]; // 空テキストの場合は空のパスのみ
+            
+            for (let i = 0; i < n; i++) {
+                if (dp[i].length === 0) continue; // この位置までの区切り方がない場合はスキップ
+                
+                const remainingText = cleanText.substring(i);
+                
+                // 可能なすべてのマッチを探す
+                for (const [key, value] of Object.entries(dictionary)) {
+                    if (remainingText.startsWith(value)) {
+                        const endIndex = i + value.length;
+                        const newItem = {
+                            reading: key,
+                            value: value,
+                            startIndex: i,
+                            endIndex: endIndex
+                        };
+                        
+                        // 既存のすべてのパスにこの新しいアイテムを追加
+                        for (const path of dp[i]) {
+                            dp[endIndex].push([...path, newItem]);
+                        }
+                    }
+                }
+                
+                // マッチがない場合は1文字進める (通常は辞書に単漢字が登録されているため起きないはず)
+                if (dp[i + 1].length === 0 && i < n) {
+//                    return -1;
+                    const char = cleanText.charAt(i);
+                    const newItem = {
+                        reading: char,
+                        value: char,
+                        startIndex: i,
+                        endIndex: i + 1
+                    };
+                    
+                    for (const path of dp[i]) {
+                        dp[i + 1].push([...path, newItem]);
+                    }
+                }
+            }
+            
+            // 最長マッチを優先して選択 (区切り数が最小のもの)
+            let bestPattern = null;
+            let bestScore = Infinity;
+            let bestIndex = Infinity;
+            
+            for (const pattern of dp[n]) {
+                const score = pattern.length; // 区切り数
+                const firstThreeCharIndex = pattern.findIndex(item => item.reading.length === 3);
+                
+                if (pattern.length > 0) {
+                    if (score < bestScore) {
+                        bestPattern = pattern;
+                        bestScore = score;
+                        bestIndex = firstThreeCharIndex
+                    } else if (firstThreeCharIndex >= 0 && score === bestScore) {
+                        if (firstThreeCharIndex < bestIndex) {
+                            bestPattern = pattern;
+                            bestScore = score;
+                            bestIndex = firstThreeCharIndex
+                        }
+                    }
+                }
+            }
+            
+            // 最長マッチを主要な読みとして、他のパターンを代替として保存
+            const readings = bestPattern.map((item) => {
+                return {
+                    reading: item.reading,
+                    value: item.value,
+                    completed: false,
+                    startIndex: item.startIndex,
+                    endIndex: item.endIndex
+                };
+            });
+            
+            // 代替パターンを追加
+            readings.alternatives = dp[n].filter(pattern => pattern !== bestPattern);
+
+            return readings;
+        }
+
+
+
+
+
         // 読み単位を解析して表示用データを作成
         function analyzeTargetReadings() {
             if (!currentTarget) return;
@@ -466,6 +579,7 @@
             
             // 入力済み読みをリセット
             completedReadings = [];
+            completedIndex = 0;
             // 現在の入力対象の読み単位を解析
             analyzeTargetReadings();
             
@@ -558,7 +672,7 @@
         }
 
         // 入力された漢字が入力対象の順序に一致するかチェック
-        function checkCompletedChars(value) {
+        function checkCompletedChars_org(value) {
             if (!currentTarget || !currentTargetReadings.length) return;
             
             // 次に入力されるべき読みのインデックス
@@ -583,6 +697,48 @@
                 }
             }
         }
+
+
+        // 入力された漢字が入力対象の順序に一致するかチェック
+        function checkCompletedChars(value) {
+            if (!currentTarget || !currentTargetReadings.length) return;
+            
+            const cleanText = currentTarget.text.replace(/\s+/g, '');
+            
+            // 現在のインデックス位置を取得
+            let currentIndex = completedIndex;
+            
+            // 入力値のマッチ位置を検索
+            const matchPosition = cleanText.indexOf(value);
+            
+            // マッチが見つかり、かつマッチ位置が現在のインデックス以前の場合
+            if (matchPosition !== -1 && matchPosition <= currentIndex) {
+                // 入力値の末尾位置を計算
+                completedIndex = matchPosition + value.length;
+                
+                completedReadings = [];
+                // マッチした部分をカバーする読み単位を特定
+                for (let i = 0; i < currentTargetReadings.length; i++) {
+                    const reading = currentTargetReadings[i];
+                    if (reading.endIndex > completedIndex) {
+                        break;
+                    }
+                    completedReadings.push(i);
+                }
+                
+                // 表示を更新
+                updateTargetDisplay();
+                
+                // すべての読みが完了したかチェック
+                if (completedReadings.length === currentTargetReadings.length) {
+                    setTimeout(() => {
+                        alert("入力完了！次の問題に進みます。");
+                        goToNextTarget();
+                    }, 500);
+                }
+            }
+        }
+
 
         // バックスペース処理
         function backspaceBuffer() {
@@ -685,10 +841,18 @@
                 
                 // 既存の辞書をマージまたは置き換え
                 const dictType = dictionaryTypeSelect.value;
+                const dicName = "ユーザー" + String(Object.keys(dictionaries).length - 1)
                 if (Object.keys(customDictionary).length > 0) {
-                    dictionaries[dictType] = customDictionary;
-                    dictionary = dictionaries[dictType];
+//                    dictionaries[dictType] = customDictionary;
+//                    dictionary = dictionaries[dictType];
+                    dictionaries[dicName] = customDictionary;
+                    dictionary = dictionaries[dicName];
+
+                    dictionaryTypeSelect.add(new Option(dicName + " (" +file.name+ ")", dicName));
+                    dictionaryTypeSelect.value = dicName;
+
                     alert(`${Object.keys(customDictionary).length}件の辞書エントリを読み込みました。`);
+                    dictionaryForDataset[currentDataSet] = dicName
                     analyzeTargetReadings()
                     updateDisplay();
                 } else {
