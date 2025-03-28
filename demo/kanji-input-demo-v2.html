@@ -52,6 +52,17 @@
             margin-bottom: 10px;
             min-height: 20px;
         }
+
+        .message-display {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin-bottom: 10px;
+            min-height: 20px;
+            height: 20px;
+        }
+
         textarea {
             width: 100%;
             height: 100px;
@@ -62,7 +73,7 @@
             resize: vertical;
         }
         .button-group {
-            display: flex;
+            display: none;
             gap: 10px;
             margin-bottom: 15px;
         }
@@ -127,6 +138,13 @@
             background-color: #f5f5f5;
             border-radius: 4px;
         }
+        .problems-upload {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+
         .tab-group {
             display: flex;
             margin-bottom: 15px;
@@ -146,7 +164,146 @@
             border-bottom-color: #fff;
             font-weight: bold;
         }
-    </style>
+
+        .loading-container {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .loading-container.visible {
+            display: block;
+        }
+
+        .toggle-settings-button {
+            background-color: #f0f0f0;
+            color: #333;
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+            text-align: left;
+        }
+
+        .toggle-icon {
+            float: right;
+        }
+
+
+
+        /* 辞書セレクタのスタイル */
+        .dictionary-selector {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        .dictionary-selector label {
+            margin-right: 10px;
+            font-weight: normal;
+        }
+
+        .dictionary-selector select {
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        /* 設定ヘッダーのスタイル */
+        .settings-header {
+            display: flex;
+            align-items: center;
+            background-color: #f0f0f0;
+            padding: 8px 12px;
+            border-radius: 4px 4px 0 0;
+            border: 1px solid #ddd;
+            margin-top: 20px;
+            cursor: pointer;
+        }
+
+        .settings-title {
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .toggle-settings-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            color: #666;
+            width: auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toggle-icon {
+            font-size: 12px;
+        }
+
+        /* 設定コンテナのスタイル */
+        .settings-container {
+            display: none;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 0 0 4px 4px;
+            border: 1px solid #ddd;
+            border-top: none;
+        }
+
+        .settings-container.visible {
+            display: block;
+        }
+
+        .dictionary-upload, .problems-upload {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+
+        /* ファイル選択とテキスト入力のグループスタイル */
+        .file-input-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .name-input {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .name-input label {
+            white-space: nowrap;
+        }
+
+        .name-input input {
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            min-width: 150px;
+        }
+
+        @media (max-width: 768px) {
+            .file-input-group {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .name-input {
+                width: 100%;
+            }
+            
+            .name-input input {
+                flex-grow: 1;
+            }
+        }
+</style>
 </head>
 <body>
     <h1>漢字入力システムデモ</h1>
@@ -155,7 +312,7 @@
         <div class="tab-group">
             <div class="tab active" data-target="names-kanji">姓名（漢字）</div>
             <div class="tab" data-target="names-katakana">姓名（カタカナ）</div>
-<!---            <div class="tab" data-target="addresses">住所</div> -->
+            <div class="tab" data-target="addresses">住所</div>
         </div>
         
         <div class="input-section">
@@ -166,10 +323,19 @@
             
             <div class="input-area">
                 <div class="input-display" id="inputDisplay">入力状態: 待機中</div>
+                <div class="message-display" id="messageArea">下段の読みを入力してください</div>
                 <textarea id="inputField" placeholder="ここに入力してください..."></textarea>
             </div>
-            
-            <div class="button-group">
+
+            <div class="dictionary-selector">
+                <label for="dictionaryType">選択中の辞書: </label>
+                <select id="dictionaryType">
+                    <option value="kanji">漢字辞書</option>
+                    <option value="katakana">カタカナ辞書</option>
+                </select>
+            </div>
+
+            <div class="button-group" >
                 <button id="nextTarget" class="secondary">更新 (F5)</button>
                 <button id="clearInput" class="danger">クリア (Esc)</button>
                 <button id="toggleSystem" class="toggle-button">システム停止/再開 (Ctrl+Q)</button>
@@ -179,32 +345,47 @@
         <div class="shortcuts">
             <h3>ショートカットキー</h3>
             <ul>
-                <li><strong>F5</strong>: 次の入力対象を表示</li>
+                <li><strong>F2</strong>: 現在の入力対象をスキップ</li>
+                <li><strong>Backspace / Ctrl+H</strong>: 1文字削除</li>
                 <li><strong>Esc</strong>: 入力欄をクリア</li>
-                <li><strong>Ctrl+Q</strong>: システム停止/再開</li>
                 <li><strong>Ctrl+L / Ctrl+K</strong>: 再変換</li>
-                <li><strong>Backspace</strong>: 1文字削除</li>
-                <li><strong>Ctrl+H</strong>: 1文字削除 (代替)</li>
+                <li><strong>Ctrl+Q</strong>: システム停止/再開</li>
             </ul>
         </div>
-        
-        <div class="settings">
-            <div class="settings-title">設定</div>
-            
-            <div class="setting-group">
-                <label for="dictionaryType">辞書タイプ: </label>
-                <select id="dictionaryType">
-                    <option value="kanji">漢字辞書</option>
-                    <option value="katakana">カタカナ辞書</option>
-                </select>
-            </div>
-            
+
+        <div class="settings-header">
+            <button id="toggleSettings" class="toggle-settings-button">
+                <span class="toggle-icon">▼</span>
+            </button>
+            <span class="settings-title">設定</span>
+        </div>
+
+        <div class="settings-container">
             <div class="dictionary-upload">
                 <p>独自の辞書ファイルを読み込む (形式: 読み=漢字 の行ごとのテキスト)</p>
-                <input type="file" id="dictionaryFile" accept=".txt">
-                <button id="loadDictionary" class="secondary">辞書を読み込む</button>
+                <div class="file-input-group">
+                    <input type="file" id="dictionaryFile" accept=".txt">
+                    <div class="name-input">
+                        <label for="dictionaryName">辞書名:</label>
+                        <input type="text" id="dictionaryName" placeholder="辞書の名前（省略可）">
+                    </div>
+                    <button id="loadDictionary" class="secondary">辞書を読み込む</button>
+                </div>
+            </div>            
+            
+            <div class="problems-upload">
+                <p>独自の問題ファイルを読み込む (形式: テキスト,読み の行ごとのCSVテキスト)</p>
+                <div class="file-input-group">
+                    <input type="file" id="problemsFile" accept=".txt,.csv">
+                    <div class="name-input">
+                        <label for="problemsName">問題セット名:</label>
+                        <input type="text" id="problemsName" placeholder="問題セットの名前（省略可）">
+                    </div>
+                    <button id="loadProblems" class="secondary">問題を読み込む</button>
+                </div>
             </div>
         </div>
+             
     </div>
 
     <script>
@@ -222,6 +403,7 @@
         let reConAble = 0;          // 再変換可能フラグ
         let isActive = true;        // システム有効/無効フラグ
         let isBackspacePressed = false; // バックスペース検出フラグ
+        let currentMessageTimer = null; // タイマーIDを保持する変数
         
         // 入力対象データ
         let targetData = {
@@ -270,6 +452,12 @@
             "addresses": "kanji"
         };
         
+        let infoForDataset = {
+            "names-kanji": { "dic": "kanji", "probIndex": 0 },
+            "names-katakana": { "dic": "katakana", "probIndex": 0 },
+            "addresses": { "dic": "kanji", "probIndex": 0 },
+        };
+
         // 現在のターゲットデータセット
         let currentDataSet = "names-kanji";
         // 現在の入力対象インデックス
@@ -285,6 +473,7 @@
         // DOM要素
         const inputField = document.getElementById('inputField');
         const inputDisplay = document.getElementById('inputDisplay');
+        const messageArea = document.getElementById('messageArea');
         const toggleButton = document.getElementById('toggleSystem');
         const nextTargetButton = document.getElementById('nextTarget');
         const clearInputButton = document.getElementById('clearInput');
@@ -292,8 +481,13 @@
         const targetReadingElement = document.getElementById('targetReading');
         const dictionaryTypeSelect = document.getElementById('dictionaryType');
         const dictionaryFileInput = document.getElementById('dictionaryFile');
+        const problemsFileInput = document.getElementById('problemsFile');
         const loadDictionaryButton = document.getElementById('loadDictionary');
-        const tabs = document.querySelectorAll('.tab');
+        const loadProblemsButton = document.getElementById('loadProblems');
+        const dictionaryNameInput = document.getElementById('dictionaryName');
+        const problemsNameInput = document.getElementById('problemsName');
+
+        let tabs = document.querySelectorAll('.tab');
 
         // サンプル漢字辞書データ
         const sampleKanjiDictionary = {
@@ -330,17 +524,139 @@
         };
 
         // 辞書の初期化
-        function initDictionaries() {
-            dictionaries.kanji = sampleKanjiDictionary;
+        function initDictionaries_org() {
+            dictionaries.kanji = initialDicload("./dictionary-local.txt");
+//            dictionaries.kanji = sampleKanjiDictionary;
             dictionaries.katakana = sampleKatakanaDictionary;
             dictionary = dictionaries[currentDictionary];
         }
+
+        function initialDicload_org(file){
+            const i_dict = {};
+            fetch(file)
+                .then(response => response.text())
+                .then(text => {
+
+                    console.log(text.charCodeAt(0));
+                    const lines = text.split('\n');
+                
+                    // 行ごとに処理
+                    lines.forEach(line => {
+                        if (!line.trim()) return;
+                        const [key, value] = line.split('=');
+                        if (key && value) {
+                            i_dict[key.trim()] = value.trim();
+                        }
+                    });                         
+//                    console.log(i_dict);
+                })
+                .catch(error => console.error('ファイル読み込みエラー:', error));
+
+            return i_dict;
+        }
+
+
+
+        // ファイル読み込み関数をPromiseを返すように変更
+        function initalProbelmLoad(filePath) {
+            const customProblems = [];
+            return fetch(filePath)
+                .then(response => response.text())
+                .then(text => {
+                    // テキストを処理してデータ構造に変換
+                    const lines = text.split('\n');
+                
+                    // 行ごとに処理
+                    lines.forEach(line => {
+                        if (!line.trim()) return;
+                        
+                        let text, kana;
+                        if (line.startsWith(',')) {
+                            // カンマから始まる場合はkanaのみ
+                            kana = line.substring(1).trim();
+                            text = kana; // textにもkanaを設定
+                        } else if (line.includes(',')) {
+                            // カンマがある場合はtext,kana
+                            [text, kana] = line.split(',', 2);
+                            text = text.trim();
+                            kana = kana.trim();
+                        } else {
+                            // カンマがない場合はtextのみ
+                            text = line.trim();
+                            kana = text; // kanaにもtextを設定
+                        }
+                    
+                    customProblems.push({ text, kana });
+
+                    });                         
+//                    console.log(customProblems);
+                    return customProblems; // 処理したデータを返す
+                })
+                .catch(error => console.error('ファイル読み込みエラー:', error));
+        }
+
+
+
+
+
+        // ファイル読み込み関数をPromiseを返すように変更
+        function initialDicload(filePath) {
+            const i_dict = {};
+            return fetch(filePath)
+                .then(response => response.text())
+                .then(text => {
+                // テキストを処理してデータ構造に変換
+                    const lines = text.split('\n');
+                
+                    // 行ごとに処理
+                    lines.forEach(line => {
+                        if (!line.trim()) return;
+                        const [key, value] = line.split('=');
+                        if (key && value) {
+                            i_dict[key.trim()] = value.trim();
+                        }
+                    });                         
+//                    console.log(i_dict);
+                    return i_dict; // 処理したデータを返す
+                })
+                .catch(error => console.error('ファイル読み込みエラー:', error));
+        }
+
+        // 辞書初期化関数
+        async function initDictionaries() {
+            try {
+                // 複数のファイルを並行して読み込み、全ての完了を待つ
+                const [kanjiDict, kanjiProblem] = await Promise.all([
+                    initialDicload("./dictionary-local.txt"),
+//                    initialDicload("./dictionary-kana.txt")
+                    initalProbelmLoad("./names.txt")
+
+                ]);
+
+                
+
+
+                // 読み込んだデータを格納
+                dictionaries.kanji = kanjiDict;
+//                dictionaries.kana = kanaDict;
+                dictionaries.katakana = sampleKatakanaDictionary;
+                dictionary = dictionaries[currentDictionary];
+
+                targetData["names-kanji"] = kanjiProblem
+                
+                console.log("全ての辞書の読み込みが完了しました");
+
+            } catch (error) {
+                console.error("辞書の読み込み中にエラーが発生しました:", error);
+                throw error; // エラーを呼び出し元に伝播
+            }
+        }        
 
         // 辞書タイプの切り替え
         function switchDictionary(type) {
             currentDictionary = type;
 
-            dictionaryForDataset[currentDataSet] = type
+            infoForDataset[currentDataSet].dic = type
 
             dictionary = dictionaries[type];
             dictionaryTypeSelect.value = type;
@@ -352,17 +668,11 @@
         // データセットの切り替え
         function switchDataSet(dataSet) {
             currentDataSet = dataSet;
-            currentTargetIndex = 0;
+            currentTargetIndex = infoForDataset[dataSet].probIndex;
             completedChars = [];
             
             // データセットに応じて辞書を切り替え
-//            if (dataSet === "names-katakana") {
-//                switchDictionary("katakana");
-//            } else {
-//                switchDictionary("kanji");
-//            }
-            
-            dictlabel = dictionaryForDataset[dataSet]
+            dictlabel = infoForDataset[dataSet].dic
             switchDictionary(dictlabel)
 
             // タブのアクティブ状態を更新
@@ -592,12 +902,18 @@
         // 次の入力対象に進む
         function goToNextTarget() {
             currentTargetIndex = (currentTargetIndex + 1) % targetData[currentDataSet].length;
+            infoForDataset[currentDataSet].probIndex = currentTargetIndex
             showNextTarget();
+            showMessage("第 " + (currentTargetIndex + 1) + " 問 (" + targetData[currentDataSet].length + " 問中)", 0);
         }
 
         // 入力表示の更新
         function updateDisplay() {
             inputDisplay.textContent = `再変換:${reConAble} マッチ:${matchCount} | 前回:${lastFixKey} - 現在:${inputBuffer}`;
+        }
+
+        function messageDisplay(text) {
+            messageArea.textContent = text;
         }
 
         // バッファのクリア
@@ -691,7 +1007,7 @@
                 // すべての読みが入力されたかチェック
                 if (completedReadings.length === currentTargetReadings.length) {
                     setTimeout(() => {
-                        alert("入力完了！次の問題に進みます。");
+                        showMessage("入力完了！次の問題に進みます。");
                         goToNextTarget();
                     }, 500);
                 }
@@ -731,10 +1047,11 @@
                 
                 // すべての読みが完了したかチェック
                 if (completedReadings.length === currentTargetReadings.length) {
+                    showMessage("入力完了！次の問題に進みます。");
                     setTimeout(() => {
-                        alert("入力完了！次の問題に進みます。");
                         goToNextTarget();
-                    }, 500);
+//                        showMessage("入力完了！次の問題に進みます。" + (currentTargetIndex + 1) + "/" + targetData[currentDataSet].length);
+                    }, 1000);
                 }
             }
         }
@@ -810,9 +1127,12 @@
                 inputDisplay.textContent = "システム停止中";
                 inputDisplay.style.backgroundColor = "#FF9900";
                 toggleButton.classList.add('suspended');
+                showMessage("システム停止中", 0);
+
             } else {
                 inputDisplay.style.backgroundColor = "#f5f5f5";
                 toggleButton.classList.remove('suspended');
+                showMessage("システム再開します");
                 updateDisplay();
             }
         }
@@ -829,7 +1149,7 @@
             reader.onload = function(e) {
                 const content = e.target.result;
                 const customDictionary = {};
-                
+
                 // 行ごとに処理
                 content.split('\n').forEach(line => {
                     if (!line.trim()) return;
@@ -839,20 +1159,27 @@
                     }
                 });
                 
-                // 既存の辞書をマージまたは置き換え
-                const dictType = dictionaryTypeSelect.value;
-                const dicName = "ユーザー" + String(Object.keys(dictionaries).length - 1)
-                if (Object.keys(customDictionary).length > 0) {
-//                    dictionaries[dictType] = customDictionary;
-//                    dictionary = dictionaries[dictType];
-                    dictionaries[dicName] = customDictionary;
-                    dictionary = dictionaries[dicName];
+                // カスタム辞書名を取得
+                let customName = dictionaryNameInput.value.trim();
 
-                    dictionaryTypeSelect.add(new Option(dicName + " (" +file.name+ ")", dicName));
-                    dictionaryTypeSelect.value = dicName;
+                // 既存の辞書をマージまたは置き換え
+                const dicName = "ユーザー" + String(Object.keys(dictionaries).length - 1);
+                if (Object.keys(customDictionary).length > 0) {
+
+                    if (!customName) {
+                        customName = "ユーザー辞書" + (Object.keys(dictionaries).length - 1);
+                    }         
+
+                    const dictKey = "custom-dict-" + Date.now();
+                    dictionaries[dictKey] = customDictionary;
+                    dictionary = dictionaries[dictKey];
+
+                    // セレクタに新しい辞書を追加
+                    dictionaryTypeSelect.add(new Option(customName + " (" +file.name+ ")", dictKey));
+                    dictionaryTypeSelect.value = dictKey;
 
                     alert(`${Object.keys(customDictionary).length}件の辞書エントリを読み込みました。`);
-                    dictionaryForDataset[currentDataSet] = dicName
+                    infoForDataset[currentDataSet].dic = dictKey
                     analyzeTargetReadings()
                     updateDisplay();
                 } else {
@@ -860,6 +1187,170 @@
                 }
             };
             reader.readAsText(file);
+        }
+
+        // 外部問題ファイルを読み込む
+        function loadExternalProblems_old() {
+            const file = problemsFileInput.files[0];
+            if (!file) {
+                alert("ファイルを選択してください。");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const customProblems = [];
+                
+                // 行ごとに処理
+                content.split('\n').forEach(line => {
+                    if (!line.trim()) return;
+                    
+                    let text, kana;
+                    if (line.startsWith(',')) {
+                        // カンマから始まる場合はkanaのみ
+                        kana = line.substring(1).trim();
+                        text = kana; // textにもkanaを設定
+                    } else if (line.includes(',')) {
+                        // カンマがある場合はtext,kana
+                        [text, kana] = line.split(',', 2);
+                        text = text.trim();
+                        kana = kana.trim();
+                    } else {
+                        // カンマがない場合はtextのみ
+                        text = line.trim();
+                        kana = text; // kanaにもtextを設定
+                    }
+                    
+                    customProblems.push({ text, kana });
+                });
+                
+                // 問題が読み込めた場合
+                if (customProblems.length > 0) {
+                    // 新しいデータセット名を生成
+                    const datasetName = `custom-${Object.keys(targetData).length + 1}`;
+                    
+                    // 既存のデータセットに追加
+                    targetData[datasetName] = customProblems;
+                    infoForDataset[datasetName].probIndex = 0;
+                    
+                    // 新しいタブを追加
+                    addDatasetTab(datasetName, file.name);
+                    
+                    alert(`${customProblems.length}件の問題を読み込みました。`);
+                    
+                    // 新しいデータセットに切り替え
+                    switchDataSet(datasetName);
+                } else {
+                    alert("有効な問題が見つかりませんでした。");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // 外部問題ファイルを読み込む
+        function loadExternalProblems() {
+            const file = problemsFileInput.files[0];
+            if (!file) {
+                alert("ファイルを選択してください。");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const customProblems = [];
+                
+                // 行ごとに処理
+                content.split('\n').forEach(line => {
+                    if (!line.trim()) return;
+                    
+                    let text, kana;
+                    if (line.startsWith(',')) {
+                        // カンマから始まる場合はkanaのみ
+                        kana = line.substring(1).trim();
+                        text = kana; // textにもkanaを設定
+                    } else if (line.includes(',')) {
+                        // カンマがある場合はtext,kana
+                        [text, kana] = line.split(',', 2);
+                        text = text.trim();
+                        kana = kana.trim();
+                    } else {
+                        // カンマがない場合はtextのみ
+                        text = line.trim();
+                        kana = text; // kanaにもtextを設定
+                    }
+                    
+                    customProblems.push({ text, kana });
+                });
+                
+                // 問題が読み込めた場合
+                if (customProblems.length > 0) {
+                    // カスタム問題セット名を取得
+                    let customName = problemsNameInput.value.trim();
+                    
+                    // 新しいデータセット名を生成
+                    const datasetKey = `custom-${Date.now()}`;
+                    
+                    // 既存のデータセットに追加
+                    targetData[datasetKey] = customProblems;
+                    
+                    // 表示名の設定
+                    if (!customName) {
+                        customName = file.name || `問題セット ${Object.keys(targetData).length}`;
+                    }
+                    
+                    // 新しいタブを追加
+                    addDatasetTab(datasetKey, customName);
+                    
+                    alert(`${customProblems.length}件の問題を読み込みました。`);
+                    
+                    // 新しいデータセットに切り替え
+                    switchDataSet(datasetKey);
+                    
+                    // 名前入力欄をクリア
+                    problemsNameInput.value = '';
+                } else {
+                    alert("有効な問題が見つかりませんでした。");
+                }
+            };
+            reader.readAsText(file);
+}
+
+
+        
+        // 新しいデータセットのタブを追加する関数
+        function addDatasetTab(datasetName, displayName) {
+            const tabGroup = document.querySelector('.tab-group');
+            const newTab = document.createElement('div');
+            newTab.className = 'tab';
+            newTab.dataset.target = datasetName;
+            newTab.textContent = displayName || `問題セット ${datasetName.split('-')[1]}`;
+            
+            // データセット用の辞書タイプを設定
+            infoForDataset[datasetName].dic = currentDictionary;
+            
+            // タブクリックイベントを追加
+            newTab.addEventListener('click', function() {
+                switchDataSet(this.dataset.target);
+            });
+            
+            tabGroup.appendChild(newTab);
+            tabs = document.querySelectorAll('.tab');
+        }
+
+        // 設定パネルの表示/非表示を切り替える
+        function toggleSettingsPanel() {
+            const settingsContainer = document.querySelector('.settings-container');
+            const toggleIcon = document.querySelector('.toggle-icon');
+            
+            settingsContainer.classList.toggle('visible');
+            
+            if (settingsContainer.classList.contains('visible')) {
+                toggleIcon.textContent = '▲';
+            } else {
+                toggleIcon.textContent = '▼';
+            }
         }
 
         // キー入力イベント
@@ -895,9 +1386,11 @@
                 clearInputField();
                 e.preventDefault();
                 return;
-            } else if (e.key === 'F5') {
+            } else if (e.key === 'F2') {
                 goToNextTarget();
+                showMessage("次の問題に進みます。" + (currentTargetIndex + 1) + "/" + targetData[currentDataSet].length);
                 e.preventDefault();
+
                 return;
             } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Tab' ||
                        e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -908,7 +1401,29 @@
             
             // 通常の入力処理は input イベントで行う
         });
-        
+
+        // タイマー付メッセージ表示
+        function showMessage(message, duration = 2000) {
+            // 既存のタイマーがあればクリアする
+            if (currentMessageTimer !== null) {
+                clearTimeout(currentMessageTimer);
+                currentMessageTimer = null;
+            }
+            
+            // メッセージを表示
+            messageDisplay(message);
+            
+            // durationが指定されている場合のみタイマーをセット
+            if (duration > 0) {
+                currentMessageTimer = setTimeout(() => {
+                    messageDisplay("");
+                    currentMessageTimer = null;
+                }, duration);
+            }
+            
+            return currentMessageTimer;
+        }
+
         // バックスペースのキーアップでフラグをリセット
         inputField.addEventListener('keyup', function(e) {
             if (e.key === 'Backspace' || (e.ctrlKey && e.key === 'h')) {
@@ -950,6 +1465,9 @@
         // 辞書読み込みボタンのクリックイベント
         loadDictionaryButton.addEventListener('click', loadExternalDictionary);
 
+        // 問題読み込みボタンのクリックイベント
+        loadProblemsButton.addEventListener('click', loadExternalProblems);
+
         // 辞書タイプ変更イベント
         dictionaryTypeSelect.addEventListener('change', function() {
             switchDictionary(this.value);
@@ -962,10 +1480,21 @@
             });
         });
 
+        // 初期化を実行する関数
+        async function initialize() {
+            await initDictionaries();
+            showNextTarget();
+            updateDisplay();
+        }
+
+        // 設定トグルボタンのクリックイベント
+        document.querySelector('.settings-header').addEventListener('click', toggleSettingsPanel);
+
         // 初期化
-        initDictionaries();
-        showNextTarget();
-        updateDisplay();
+        initialize().catch(error => {
+            console.error("初期化中にエラーが発生しました:", error);
+        });
+
     </script>
 </body>
 </html>
