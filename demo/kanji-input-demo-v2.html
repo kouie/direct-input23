@@ -458,17 +458,16 @@
             "addresses": { "dic": "kanji", "probIndex": 0 },
         };
 
-        // 現在のターゲットデータセット
-        let currentDataSet = "names-kanji";
-        // 現在の入力対象インデックス
-        let currentTargetIndex = 0;
-        // 現在の入力対象
-        let currentTarget = null;
-        // 入力済みの読み単位（インデックス）
-        let completedReadings = [];
+        // 許可する type のリスト
+        const ALLOWED_TYPES = ["message"];        
+        
+        let currentDataSet = "names-kanji"; // 現在のターゲットデータセット
+        let currentTargetIndex = 0;     // 現在の入力対象インデックス (どこまで進んだか)
+        let currentTarget = null;       // 現在の入力対象
+        let completedReadings = [];     // 入力済みの読み単位（インデックス）
         let completedIndex = 0;
-        // 現在の入力対象の読み単位の配列
-        let currentTargetReadings = [];
+        let currentTargetReadings = []; // 現在の入力対象の読み単位の配列
+        let currentCompletedTarget = "" // 入力完了 (隠れ読みに対応するなら)
 
         // DOM要素
         const inputField = document.getElementById('inputField');
@@ -524,38 +523,6 @@
         };
 
         // 辞書の初期化
-        function initDictionaries_org() {
-            dictionaries.kanji = initialDicload("./dictionary-local.txt");
-//            dictionaries.kanji = sampleKanjiDictionary;
-            dictionaries.katakana = sampleKatakanaDictionary;
-            dictionary = dictionaries[currentDictionary];
-        }
-
-        function initialDicload_org(file){
-            const i_dict = {};
-            fetch(file)
-                .then(response => response.text())
-                .then(text => {
-
-                    console.log(text.charCodeAt(0));
-                    const lines = text.split('\n');
-                
-                    // 行ごとに処理
-                    lines.forEach(line => {
-                        if (!line.trim()) return;
-                        const [key, value] = line.split('=');
-                        if (key && value) {
-                            i_dict[key.trim()] = value.trim();
-                        }
-                    });                         
-//                    console.log(i_dict);
-                })
-                .catch(error => console.error('ファイル読み込みエラー:', error));
-
-            return i_dict;
-        }
-
-
 
         // ファイル読み込み関数をPromiseを返すように変更
         function initalProbelmLoad(filePath) {
@@ -564,39 +531,114 @@
                 .then(response => response.text())
                 .then(text => {
                     // テキストを処理してデータ構造に変換
-                    const lines = text.split('\n');
-                
-                    // 行ごとに処理
-                    lines.forEach(line => {
-                        if (!line.trim()) return;
-                        
-                        let text, kana;
-                        if (line.startsWith(',')) {
-                            // カンマから始まる場合はkanaのみ
-                            kana = line.substring(1).trim();
-                            text = kana; // textにもkanaを設定
-                        } else if (line.includes(',')) {
-                            // カンマがある場合はtext,kana
-                            [text, kana] = line.split(',', 2);
-                            text = text.trim();
-                            kana = kana.trim();
-                        } else {
-                            // カンマがない場合はtextのみ
-                            text = line.trim();
-                            kana = text; // kanaにもtextを設定
-                        }
-                    
-                    customProblems.push({ text, kana });
+                    const lines = text.split('\n').filter(line => line.trim() !== '');
+                    const result = lines.map(line => parseLine(line));
 
-                    });                         
-//                    console.log(customProblems);
-                    return customProblems; // 処理したデータを返す
+                    return result;
                 })
-                .catch(error => console.error('ファイル読み込みエラー:', error));
+                .catch(error => {
+                    console.error('ファイル読み込みエラー:', error);
+                });
         }
 
+        // 1行のテキストをパースして指定の形式のオブジェクトを返す関数
+        function parseLine(line) {
+            // カンマが存在するかチェック
+         
+            const commaIndex = line.indexOf(',');
+            let text = ""
+            let objStr = ""
+            if (commaIndex === -1) {
+                // カンマがない場合は行全体をtextとして登録
+                text = line.trim();
+                const remainingPart = ""
+                objStr = `{\"text\": \"${text}\", \"marks\": []}`;
+//                objStr = `{\"text\": \"${text}\"}`;
+            } else {
+                // カンマがある場合は、カンマまでをtextとして取得
+                text = line.substring(0, commaIndex).trim();
+                const remainingPart = line.substring(commaIndex + 1).trim();
+                objStr = `{\"text\": \"${text}\", ${remainingPart}}`;
+            }
 
+            try {
+                const parsedString = processUserData(objStr);
 
+                if (parsedString.valid === true) {
+                    return parsedString.data;
+                }else{
+                    return {"text": text, "marks": []};             
+                }
+
+            } catch (error) {
+                console.error('プロパティの解析に失敗しました:', error);
+                // エラーが発生した場合は、テキスト部分だけを含むオブジェクトを返す
+                const onlyText = {"text": text}
+                return onlyText;
+            }
+        }
+
+        // ユーザーデータを検証して処理する
+        function processUserData(userData) {
+            // JSONとしての検証
+            try {
+                if (typeof userData === "string") {
+                userData = JSON.parse(userData);
+                }
+            } catch (e) {
+                return { valid: false, error: "Invalid JSON format" };
+            }
+            
+            // 基本構造の検証
+            if (!userData.text || !Array.isArray(userData.marks)) {
+                return {
+                    valid: valid,
+                    data: {
+                        text: String(userData.text),
+                        marks: []
+                    }
+                };
+            }
+            
+            // 各マークの検証
+            const validatedMarks = [];
+            for (const mark of userData.marks) {
+                // 必須フィールドのチェック
+                if (typeof mark.index !== "number" || !mark.type) {
+                    continue; // 無効なマークはスキップ
+                }
+                
+                // typeのホワイトリストチェック
+                if (!ALLOWED_TYPES.includes(mark.type)) {
+                    continue; // 許可されていないtypeはスキップ
+                }
+                
+                // conditionsの検証
+                if (Array.isArray(mark.conditions)) {
+                    const validConditions = mark.conditions.filter(cond => 
+                        typeof cond === "object" && cond.comp && typeof cond.comp === "string"
+                );
+                   mark.conditions = validConditions;
+                } else {
+                  mark.conditions = [];
+                }
+                
+                // repeatの検証
+                if (mark.repeat !== "yes" && mark.repeat !== "no") {
+                    mark.repeat = "no"; // デフォルト値
+                }
+                
+                validatedMarks.push(mark);
+            }
+            
+            return {
+                valid: true,
+                data: {
+                    text: String(userData.text),
+                    marks: validatedMarks
+                }
+            };
+        }
 
 
         // ファイル読み込み関数をPromiseを返すように変更
@@ -626,24 +668,20 @@
         async function initDictionaries() {
             try {
                 // 複数のファイルを並行して読み込み、全ての完了を待つ
-                const [kanjiDict, kanjiProblem] = await Promise.all([
+                const [kanjiDict, kanaDict, kanjiProblem] = await Promise.all([
                     initialDicload("./dictionary-local.txt"),
-//                    initialDicload("./dictionary-kana.txt")
+                    initialDicload("./dictionary-kana.txt"),
                     initalProbelmLoad("./names.txt")
-
                 ]);
 
-                
-
-
                 // 読み込んだデータを格納
+//                dictionaries.kanji = sampleKanjiDictionary;
+//                dictionaries.katakana = sampleKatakanaDictionary;
                 dictionaries.kanji = kanjiDict;
-//                dictionaries.kana = kanaDict;
-                dictionaries.katakana = sampleKatakanaDictionary;
+                dictionaries.katakana = kanaDict;
                 dictionary = dictionaries[currentDictionary];
 
                 targetData["names-kanji"] = kanjiProblem
-                
                 console.log("全ての辞書の読み込みが完了しました");
 
             } catch (error) {
@@ -686,54 +724,6 @@
             
             showNextTarget();
         }
-
-        // 入力対象テキストから読みを最長マッチで生成
-        function generateReading_org(text) {
-            const cleanText = text.replace(/\s+/g, '');
-            const readings = [];
-            
-            let remainingText = cleanText;
-            let startIndex = 0;
-            
-            while (remainingText.length > 0) {
-                let bestMatch = '';
-                let bestMatchLength = 0;
-                let bestValue = '';
-                
-                // 辞書を走査して最長マッチを探す
-                for (const [key, value] of Object.entries(dictionary)) {
-                    if (remainingText.startsWith(value) && value.length > bestMatchLength) {
-                        bestMatch = key;
-                        bestMatchLength = value.length;
-                        bestValue = value;
-                    }
-                }
-                
-                if (bestMatch) {
-                    // 最長マッチが見つかった
-                    readings.push({
-                        reading: bestMatch,
-                        value: bestValue,
-                        completed: false
-                    });
-                    remainingText = remainingText.slice(bestMatchLength);
-                    startIndex += bestMatchLength;
-                } else {
-                    // マッチが見つからない場合は1文字進める
-                    readings.push({
-                        reading: remainingText.charAt(0),
-                        value: remainingText.charAt(0),
-                        completed: false
-                    });
-                    remainingText = remainingText.slice(1);
-                    startIndex += 1;
-                }
-            }
-            
-            return readings;
-        }
- 
-
 
         // 動的計画法を使用して入力対象テキストからすべての可能な読みパターンを生成する関数
         function generateReading(text) {
@@ -825,10 +815,6 @@
             return readings;
         }
 
-
-
-
-
         // 読み単位を解析して表示用データを作成
         function analyzeTargetReadings() {
             if (!currentTarget) return;
@@ -843,17 +829,20 @@
             
             // 漢字テキスト（色分け）
             let textHtml = '';
+            let displayText = '';
             for (let i = 0; i < currentTargetReadings.length; i++) {
                 const item = currentTargetReadings[i];
                 if (completedReadings.includes(i)) {
                     textHtml += `<span style="color: #4CAF50;">${item.value}</span>`;
+                    displayText += item.value;
                 } else {
                     textHtml += `<span>${item.value}</span>`;
+                    displayText += item.value;
                 }
                 // スペースを保持
                 if (i < currentTargetReadings.length - 1 && 
                     (currentTarget.text.indexOf(' ') !== -1) && 
-                    (textHtml.length === currentTarget.text.indexOf(' '))) {
+                    (displayText.length === currentTarget.text.indexOf(' '))) {
                     textHtml += ' ';
                 }
             }
@@ -1025,7 +1014,20 @@
             let currentIndex = completedIndex;
             
             // 入力値のマッチ位置を検索
-            const matchPosition = cleanText.indexOf(value);
+            const indices = [];
+            let index = cleanText.indexOf(value);
+             while (index !== -1) {
+                indices.push(index);
+                index = cleanText.indexOf(value, index + 1);
+            }
+
+            let matchPosition = -1;
+            for (const idx of indices) {
+                if (idx <= completedIndex && idx + value.length > completedIndex) {
+                    matchPosition = idx;
+                }
+            }
+            showMessage(matchPosition,0);
             
             // マッチが見つかり、かつマッチ位置が現在のインデックス以前の場合
             if (matchPosition !== -1 && matchPosition <= currentIndex) {
@@ -1041,6 +1043,8 @@
                     }
                     completedReadings.push(i);
                 }
+
+                checkEvent(cleanText);
                 
                 // 表示を更新
                 updateTargetDisplay();
@@ -1050,12 +1054,32 @@
                     showMessage("入力完了！次の問題に進みます。");
                     setTimeout(() => {
                         goToNextTarget();
-//                        showMessage("入力完了！次の問題に進みます。" + (currentTargetIndex + 1) + "/" + targetData[currentDataSet].length);
                     }, 1000);
                 }
             }
         }
 
+        function checkEvent(target) {
+            try {
+                if (!currentTarget || currentTarget.marks.length == 0) return;
+            } catch(err) {
+                console.log(err);
+                return
+            }
+
+            // 特定の漢字が入力されたかチェック
+            for (const typingEvent of currentTarget.marks) {
+                if(completedIndex === typingEvent.index){
+                    const completedCondition = target.substr(0, typingEvent.index)
+                    if (completedCondition === typingEvent.condition){
+                        console.log("event");
+                        showMessage(typingEvent.content);
+
+                    }
+                }
+            }
+            return false;
+        }
 
         // バックスペース処理
         function backspaceBuffer() {
@@ -1291,10 +1315,12 @@
                     
                     // 新しいデータセット名を生成
                     const datasetKey = `custom-${Date.now()}`;
-                    
+                    infoForDataset[datasetKey] = {};
+                                        
                     // 既存のデータセットに追加
                     targetData[datasetKey] = customProblems;
-                    
+                    infoForDataset[datasetKey].probIndex = 0;
+                                        
                     // 表示名の設定
                     if (!customName) {
                         customName = file.name || `問題セット ${Object.keys(targetData).length}`;
@@ -1328,6 +1354,7 @@
             newTab.textContent = displayName || `問題セット ${datasetName.split('-')[1]}`;
             
             // データセット用の辞書タイプを設定
+
             infoForDataset[datasetName].dic = currentDictionary;
             
             // タブクリックイベントを追加
