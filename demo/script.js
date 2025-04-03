@@ -167,13 +167,14 @@ function parseLine(line) {
         // カンマがない場合は行全体をtextとして登録
         text = line.trim();
         const remainingPart = ""
-        objStr = `{\"text\": \"${text}\", \"marks\": []}`;
+        objStr = `{\"text\": \"${text}\", \"events\": [], \"id\": ""}`;
 //                objStr = `{\"text\": \"${text}\"}`;
     } else {
         // カンマがある場合は、カンマまでをtextとして取得
         text = line.substring(0, commaIndex).trim();
         const remainingPart = line.substring(commaIndex + 1).trim();
         objStr = `{\"text\": \"${text}\", ${remainingPart}}`;
+        string = JSON.parse(objStr);
     }
 
     try {
@@ -182,7 +183,7 @@ function parseLine(line) {
         if (parsedString.valid === true) {
             return parsedString.data;
         }else{
-            return {"text": text, "marks": []};             
+            return {"text": text, "events": []};             
         }
 
     } catch (error) {
@@ -205,52 +206,63 @@ function processUserData(userData) {
     }
     
     // 基本構造の検証
-    if (!userData.text || !Array.isArray(userData.marks)) {
+    if (!userData.text || !Array.isArray(userData.events)) {
         return {
-            valid: valid,
+            valid: true,
             data: {
                 text: String(userData.text),
-                marks: []
+                events: []
             }
         };
     }
+
+    let id = "";
+    try {
+        if (userData.id){
+            if (userData.id.indexOf(" ") === -1){
+                id = userData.id;
+            }
+        }
+    } catch (e) {
+        id = "";
+    }
     
     // 各マークの検証
-    const validatedMarks = [];
-    for (const mark of userData.marks) {
+    const validatedevents = [];
+    for (const event of userData.events) {
         // 必須フィールドのチェック
-        if (typeof mark.index !== "number" || !mark.type) {
+        if (typeof event.index !== "number" || !event.type) {
             continue; // 無効なマークはスキップ
         }
         
         // typeのホワイトリストチェック
-        if (!ALLOWED_TYPES.includes(mark.type)) {
+        if (!ALLOWED_TYPES.includes(event.type)) {
             continue; // 許可されていないtypeはスキップ
         }
         
         // conditionsの検証
-        if (Array.isArray(mark.conditions)) {
-            const validConditions = mark.conditions.filter(cond => 
+        if (Array.isArray(event.conditions)) {
+            const validConditions = event.conditions.filter(cond => 
                 typeof cond === "object" && cond.comp && typeof cond.comp === "string"
         );
-            mark.conditions = validConditions;
+            event.conditions = validConditions;
         } else {
-            mark.conditions = [];
+            event.conditions = [];
         }
         
         // repeatの検証
-        if (mark.repeat !== "yes" && mark.repeat !== "no") {
-            mark.repeat = "no"; // デフォルト値
+        if (event.repeat !== "yes" && event.repeat !== "no") {
+            event.repeat = "no"; // デフォルト値
         }
         
-        validatedMarks.push(mark);
+        validatedevents.push(event);
     }
     
     return {
         valid: true,
         data: {
             text: String(userData.text),
-            marks: validatedMarks
+            events: validatedevents
         }
     };
 }
@@ -345,6 +357,7 @@ function switchDataSet(dataSet) {
     
     if (dataSet === "tutorial"){
         dictionaryTypeSelect.disabled = true;
+        console.log("ok");
     } else {
         dictionaryTypeSelect.disabled = false;
     }
@@ -354,6 +367,7 @@ function switchDataSet(dataSet) {
 
 // 動的計画法を使用して入力対象テキストからすべての可能な読みパターンを生成する関数
 function generateReading(text) {
+
     const cleanText = text.replace(/\s+/g, '');
     const n = cleanText.length;
     
@@ -454,8 +468,15 @@ function updateTargetDisplay() {
     if (!currentTarget || !currentTargetReadings.length) return;
     
     // 漢字テキスト（色分け）
+    let leadingSpaces = currentTarget.text.match(/^[\u3000]+/)?.[0] || '';
     let textHtml = '';
     let displayText = '';
+
+    if (leadingSpaces) {
+        textHtml = `<span>${leadingSpaces}</span>`;
+        displayText = leadingSpaces;
+    }
+
     for (let i = 0; i < currentTargetReadings.length; i++) {
         const item = currentTargetReadings[i];
         if (completedReadings.includes(i)) {
@@ -465,6 +486,7 @@ function updateTargetDisplay() {
             textHtml += `<span>${item.value}</span>`;
             displayText += item.value;
         }
+        leadingSpaces = ''
         // スペースを保持
         if (i < currentTargetReadings.length - 1 && 
             (currentTarget.text.indexOf(' ') !== -1) && 
@@ -651,21 +673,21 @@ function checkCompletedChars(value) {
             showMessage("入力完了！ 次の問題に進みます。");
             setTimeout(() => {
                 goToNextTarget();
-            }, 1000);
+            }, 0);
         }
     }
 }
 
 function checkEvent(target) {
     try {
-        if (!currentTarget || currentTarget.marks.length == 0) return;
+        if (!currentTarget || currentTarget.events.length == 0) return;
     } catch(err) {
         console.log(err);
         return
     }
 
     // 特定の漢字が入力されたかチェック
-    for (const typingEvent of currentTarget.marks) {
+    for (const typingEvent of currentTarget.events) {
         if(checkingIndex === typingEvent.index){
             const completedCondition = target.substr(0, typingEvent.index)
             if (completedCondition === typingEvent.condition){
@@ -855,7 +877,7 @@ function parseUserDataFormat(str) {
     
     return {
       text: match[0],   // 最初のキャプチャグループ（キー部分）
-      marks: []
+      events: []
     };
 }
 
