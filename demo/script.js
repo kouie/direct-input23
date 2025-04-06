@@ -6,7 +6,8 @@
 let inputBuffer = "";       // 変換用バッファ
 let dictionaries = {        // 辞書セット
     "kanji": {},            // 漢字辞書
-    "katakana": {}          // カタカナ辞書
+    "katakana": {},          // カタカナ辞書
+    "tutorial" : {}
 };
 let currentDictionary = "kanji";  // 現在使用中の辞書タイプ
 let dictionary = {};        // 現在使用中の辞書
@@ -17,6 +18,8 @@ let reConAble = 0;          // 再変換可能フラグ
 let isActive = true;        // システム有効/無効フラグ
 let isBackspacePressed = false; // バックスペース検出フラグ
 let currentMessageTimer = null; // タイマーIDを保持する変数
+let nextTimerID = null;
+let isProcessing = false;   // 次の問題表示待ち (タブ切り替え用)
 
 // 入力対象データ
 let targetData = {
@@ -63,18 +66,20 @@ let dictionaryForDataset = {
     "names-kanji": "kanji",
     "names-katakana": "katakana",
     "addresses": "kanji",
-    "tutorial" : "tutorial"
+    "tutorial" : "tutorial",
+    "game" : "game"
 };
 
 let infoForDataset = {
-    "names-kanji": { "dic": "kanji", "probIndex": 0 },
-    "names-katakana": { "dic": "katakana", "probIndex": 0 },
-    "addresses": { "dic": "kanji", "probIndex": 0 },
-    "tutorial": { "dic": "tutorial", "probIndex": 0 }
+    "names-kanji": { "dic": "kanji", "probIndex": 0, "timer": 0, "message": "下段の読みを入力してください" },
+    "names-katakana": { "dic": "katakana", "probIndex": 0, "timer": 0, "message": "下段の読みを入力してください" },
+    "addresses": { "dic": "kanji", "probIndex": 0, "timer": 0, "message": "下段の読みを入力してください" },
+    "tutorial": { "dic": "tutorial", "probIndex": 0, "timer": 0, "message": "" },
+    "game": { "dic": "game", "probIndex": 0, "timer": 0, "message": "" }
 };
 
 // 許可する type のリスト
-const ALLOWED_TYPES = ["message"];        
+const ALLOWED_TYPES = ["message", "jump", "repack"];        
 
 let currentDataSet = "names-kanji"; // 現在のターゲットデータセット
 let currentTargetIndex = 0;     // 現在の入力対象インデックス (どこまで進んだか)
@@ -83,6 +88,7 @@ let completedReadings = [];     // 入力済みの読み単位（インデック
 let checkingIndex = 0;
 let currentTargetReadings = []; // 現在の入力対象の読み単位の配列
 let currentCompletedTarget = "" // 入力完了 (隠れ読みに対応するなら)
+let nextTimer = 0;
 
 // DOM要素
 const inputField = document.getElementById('inputField');
@@ -174,7 +180,7 @@ function parseLine(line) {
         text = line.substring(0, commaIndex).trim();
         const remainingPart = line.substring(commaIndex + 1).trim();
         objStr = `{\"text\": \"${text}\", ${remainingPart}}`;
-        string = JSON.parse(objStr);
+//        string = JSON.parse(objStr);
     }
 
     try {
@@ -206,15 +212,6 @@ function processUserData(userData) {
     }
     
     // 基本構造の検証
-    if (!userData.text || !Array.isArray(userData.events)) {
-        return {
-            valid: true,
-            data: {
-                text: String(userData.text),
-                events: []
-            }
-        };
-    }
 
     let id = "";
     try {
@@ -226,7 +223,30 @@ function processUserData(userData) {
     } catch (e) {
         id = "";
     }
-    
+
+    let timer = 0;
+    try {
+        if (userData.timer){
+            if (userData.timer >= 0){
+                timer = userData.timer;
+            }
+        }
+    } catch (e) {
+        id = 0;
+    }
+
+    if (!userData.text || !Array.isArray(userData.events)) {
+        return {
+            valid: true,
+            data: {
+                text: String(userData.text),
+                events: [],
+                id: id,
+                timer: timer
+            }
+        };
+    }
+
     // 各マークの検証
     const validatedevents = [];
     for (const event of userData.events) {
@@ -238,16 +258,6 @@ function processUserData(userData) {
         // typeのホワイトリストチェック
         if (!ALLOWED_TYPES.includes(event.type)) {
             continue; // 許可されていないtypeはスキップ
-        }
-        
-        // conditionsの検証
-        if (Array.isArray(event.conditions)) {
-            const validConditions = event.conditions.filter(cond => 
-                typeof cond === "object" && cond.comp && typeof cond.comp === "string"
-        );
-            event.conditions = validConditions;
-        } else {
-            event.conditions = [];
         }
         
         // repeatの検証
@@ -262,7 +272,9 @@ function processUserData(userData) {
         valid: true,
         data: {
             text: String(userData.text),
-            events: validatedevents
+            events: validatedevents,
+            id: id,
+            timer: timer            
         }
     };
 }
@@ -295,13 +307,15 @@ function initialDicload(filePath) {
 async function initDictionaries() {
     try {
         // 複数のファイルを並行して読み込み、全ての完了を待つ
-        const [kanjiDict, kanaDict, tutorialsDict, kanjiProblem, kanaProblem, tutorialProblem] = await Promise.all([
+        const [kanjiDict, kanaDict, tutorialsDict, gameDict, kanjiProblem, kanaProblem, tutorialProblem, gameData] = await Promise.all([
             initialDicload("./dictionary-local.txt"),
             initialDicload("./dictionary-kana.txt"),
             initialDicload("./tutorial-dic.txt"),
+            initialDicload("./invade-dic.txt"),
             initialProbelmLoad("./names.txt"),
             initialProbelmLoad("./kana.txt"),
-            initialProbelmLoad("./tutorial.txt")
+            initialProbelmLoad("./tutorial.txt"),
+            initialProbelmLoad("./invade.txt")
 
         ]);
 
@@ -310,11 +324,14 @@ async function initDictionaries() {
         dictionaries.kanji = kanjiDict;
         dictionaries.katakana = kanaDict;
         dictionaries.tutorial = tutorialsDict;
+        dictionaries.game = gameDict;
         dictionary = dictionaries[currentDictionary];
 
         targetData["names-kanji"] = kanjiProblem;
         targetData["names-katakana"] = kanaProblem;
         targetData["tutorial"] = tutorialProblem;
+        targetData["game"] = gameData;
+
         console.log("全ての辞書の読み込みが完了しました");
 
     } catch (error) {
@@ -336,12 +353,23 @@ function switchDictionary(type) {
     showNextTarget();
 }
 
+function clearNTimer() {
+    if (nextTimerID !== null) {
+        clearTimeout(nextTimerID);
+        nextTimer = 0;
+    }
+}
+
 // データセットの切り替え
 function switchDataSet(dataSet) {
     currentDataSet = dataSet;
     currentTargetIndex = infoForDataset[dataSet].probIndex;
+    nextTimer = infoForDataset[dataSet].timer;
+    messageArea.textContent = infoForDataset[dataSet].message;
     completedChars = [];
-    
+
+    clearNTimer();
+
     // データセットに応じて辞書を切り替え
     dictlabel = infoForDataset[dataSet].dic
     switchDictionary(dictlabel)
@@ -362,7 +390,8 @@ function switchDataSet(dataSet) {
         dictionaryTypeSelect.disabled = false;
     }
     showNextTarget();
-    checkEvent(currentTarget.text);    
+    const message = checkEvent("");
+    eventHandle(message)
 }
 
 // 動的計画法を使用して入力対象テキストからすべての可能な読みパターンを生成する関数
@@ -513,6 +542,14 @@ function updateTargetDisplay() {
     targetReadingElement.innerHTML = readingHtml;
 }
 
+function startMessage(events){
+
+    const message = events.find(item => item.type ==="message");
+    if (message){
+        showMessage(message.content, message.mtimer);
+    }
+}
+
 // 次の入力対象を表示
 function showNextTarget() {
     const targets = targetData[currentDataSet];
@@ -527,6 +564,26 @@ function showNextTarget() {
     // 入力済み読みをリセット
     completedReadings = [];
     checkingIndex = 0;
+    currentCompletedTarget = "";
+
+
+    let newtimer = 0;
+    try {
+        newtimer = currentTarget.timer;
+    } catch (err) {
+        newtimer = 0
+    }
+
+    // durationが指定されている場合のみタイマーをセット
+    clearNTimer();
+
+    if (newtimer > 0) {
+        nextTimerID = setTimeout(() => {
+            goToNextTarget();
+        }, newtimer);
+    }
+    
+
     // 現在の入力対象の読み単位を解析
     analyzeTargetReadings();
     
@@ -537,12 +594,21 @@ function showNextTarget() {
 }
 
 // 次の入力対象に進む
-function goToNextTarget() {
-    currentTargetIndex = (currentTargetIndex + 1) % targetData[currentDataSet].length;
-    infoForDataset[currentDataSet].probIndex = currentTargetIndex
-    showNextTarget();
-    showMessage("第 " + (currentTargetIndex + 1) + " 問 (" + targetData[currentDataSet].length + " 問中)", 0);
-    checkEvent(currentTarget.text)
+function goToNextTarget(value) {
+    if(!value){
+        currentTargetIndex = (currentTargetIndex + 1) % targetData[currentDataSet].length;
+        infoForDataset[currentDataSet].probIndex = currentTargetIndex
+        showNextTarget();
+        showMessage("第 " + (currentTargetIndex + 1) + " 問 (" + targetData[currentDataSet].length + " 問中)", 0);
+    } else {
+        currentTargetIndex = value;
+        infoForDataset[currentDataSet].probIndex = value;
+        showNextTarget();
+    }
+    
+    const message = checkEvent("");
+    eventHandle(message)
+
 }
 
 // 入力表示の更新
@@ -552,6 +618,7 @@ function updateDisplay() {
 
 function messageDisplay(text) {
     messageArea.textContent = text;
+    infoForDataset[currentDataSet].message = text;
 }
 
 // バッファのクリア
@@ -599,7 +666,7 @@ function checkAndConvert() {
         inputField.setSelectionRange(newPosition, newPosition);
         
         // 入力対象の文字が入力されたかチェック
-        checkCompletedChars(value);
+//        checkCompletedChars(value);
         
         // バッファと変換履歴を更新
         reConAble = 0;
@@ -608,10 +675,13 @@ function checkAndConvert() {
             inputBuffer = "";
             matchCount = 0;
             reConAble = 1;
+            currentCompletedTarget = currentCompletedTarget.slice(0, -dictionary[lastFixKey].length);
         } else {
             // 初回マッチ (2 or 3 文字)
             matchCount += 1;
         }
+
+        currentCompletedTarget += value;
         lastFixKey2 = lastFixKey;
         lastFixKey = key;
     } else {
@@ -621,6 +691,7 @@ function checkAndConvert() {
             matchCount = 0;
         }
     }
+    checkCompletedChars(value);
     updateDisplay();
 }
 
@@ -647,57 +718,115 @@ function checkCompletedChars(value) {
             matchPosition = idx;
         }
     }
-    
+
     // マッチが見つかり、かつマッチ位置が現在のインデックス以前の場合
     if (matchPosition !== -1 && matchPosition <= currentIndex) {
         // 入力値の末尾位置を計算
-        checkingIndex = matchPosition + value.length;
+//        checkingIndex = matchPosition + value.length;
         
         completedReadings = [];
         // マッチした部分をカバーする読み単位を特定
         for (let i = 0; i < currentTargetReadings.length; i++) {
             const reading = currentTargetReadings[i];
-            if (reading.endIndex > checkingIndex) {
+            if (reading.endIndex > matchPosition + value.length) {
                 break;
             }
             completedReadings.push(i);
         }
 
-        checkEvent(cleanText);
+//        currentCompletedTarget += value;
+        const checkedEvent = checkEvent(value);
+        checkingIndex = matchPosition + value.length;
         
         // 表示を更新
         updateTargetDisplay();
-        
-        // すべての読みが完了したかチェック
-        if (completedReadings.length === currentTargetReadings.length) {
-            showMessage("入力完了！ 次の問題に進みます。");
-            setTimeout(() => {
-                goToNextTarget();
-            }, 0);
+
+
+        if (!checkedEvent || checkedEvent.length === 0) {
+            // すべての読みが完了したかチェック
+            if (completedReadings.length === currentTargetReadings.length) {
+                showMessage("入力完了！ 次の問題に進みます。");
+                isProcessing = true;
+                setTimeout(() => {
+                    goToNextTarget();
+                    isProcessing = false;
+                }, 1000);
+            }
+        }else {
+            eventHandle(checkedEvent);
+
+/*            
+            const messageEvent = checkedEvent.find(item => item.type ==="message");
+            const jumpEvent = checkedEvent.find(item => item.type ==="jump");
+            const repackEvent = checkedEvent.find(item => item.type ==="repack");
+
+            if (messageEvent){
+                showMessage(messageEvent.content, messageEvent.mtimer);
+            }
+            if (jumpEvent){
+                goToNextTarget(jumpEvent.next);
+            }
+            if (repackEvent){
+                dataRepacking();
+            }
+*/
         }
     }
 }
 
-function checkEvent(target) {
+
+function eventHandle(checkedEvent){
+    const messageEvent = checkedEvent.find(item => item.type ==="message");
+    const jumpEvent = checkedEvent.find(item => item.type ==="jump");
+    const repackEvent = checkedEvent.find(item => item.type ==="repack");
+
+    if (messageEvent){
+        showMessage(messageEvent.content, messageEvent.mtimer);
+    }
+    if (jumpEvent){
+        goToNextTarget(jumpEvent.next);
+    }
+    if (repackEvent){
+        dataRepacking();
+    }    
+}
+
+function dataRepacking() {
+
+}
+
+function checkEvent(value) {
+
+    const cleanText = currentTarget.text.replace(/\u3000/g, '');
+    let triggered = [];
     try {
-        if (!currentTarget || currentTarget.events.length == 0) return;
+        if (!currentTarget || currentTarget.events.length == 0) return triggered;
     } catch(err) {
         console.log(err);
-        return
+        return triggered;
     }
 
     // 特定の漢字が入力されたかチェック
+
     for (const typingEvent of currentTarget.events) {
         if(checkingIndex === typingEvent.index){
-            const completedCondition = target.substr(0, typingEvent.index)
+//            const completedCondition = cleanText.substr(typingEvent.index, typingEvent.condition.length)
+            const completedCondition = currentCompletedTarget;
             if (completedCondition === typingEvent.condition){
-                console.log("event");
-                showMessage(typingEvent.content, typingEvent.timer);
-
+                if (typingEvent.type === "message"){
+                    triggered.push( {"type": "message", "content": typingEvent.content, "mtimer": typingEvent.mtimer } );
+                } else if (typingEvent.type === "jump") {
+                    const dataset = targetData[currentDataSet];
+                    const next = dataset.findIndex(item => item.id  === typingEvent.to);
+//                    goToNextTarget(next);
+                    triggered.push( {type: "jump", next:next} );
+                } else if (typingEvent.type === "repack") {
+                    triggered.push({"type": "repack", "filter": typingEvent.filter});
+                }
             }
         }
     }
-    return false;
+    return triggered;
 }
 
 // バックスペース処理
@@ -1016,7 +1145,8 @@ inputField.addEventListener('keydown', function(e) {
     } else if (e.key === 'F2') {
         goToNextTarget();
         showMessage("次の問題に進みます。" + (currentTargetIndex + 1) + "/" + targetData[currentDataSet].length);
-        checkEvent(currentTarget.text);    
+        const message = checkEvent("");
+        eventHandle(message)   
         e.preventDefault();
 
         return;
@@ -1101,11 +1231,17 @@ dictionaryTypeSelect.addEventListener('change', function() {
     switchDictionary(this.value);
 });
 
+let debounceTimer;
 // タブ切り替えイベント
 tabs.forEach(tab => {
     tab.addEventListener('click', function() {
-        showMessage("")
-        switchDataSet(this.dataset.target);
+        if (isProcessing) return;
+
+        showMessage(infoForDataset[currentDataSet].message, 0);
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            switchDataSet(this.dataset.target);
+        }, 0);
     });
 });
 
@@ -1113,7 +1249,8 @@ tabs.forEach(tab => {
 async function initialize() {
     await initDictionaries();
     showNextTarget();
-    checkEvent(currentTarget.text)
+    const message = checkEvent("");
+    eventHandle(message)
     updateDisplay();
 }
 
