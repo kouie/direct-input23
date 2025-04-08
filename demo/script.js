@@ -62,6 +62,8 @@ let targetData = {
     ]
 };
 
+let originalDataset = {};
+
 let dictionaryForDataset = {
     "names-kanji": "kanji",
     "names-katakana": "katakana",
@@ -89,6 +91,7 @@ let checkingIndex = 0;
 let currentTargetReadings = []; // 現在の入力対象の読み単位の配列
 let currentCompletedTarget = "" // 入力完了 (隠れ読みに対応するなら)
 let nextTimer = 0;
+let gameDataOriginal = [];
 
 // DOM要素
 const inputField = document.getElementById('inputField');
@@ -307,30 +310,38 @@ function initialDicload(filePath) {
 async function initDictionaries() {
     try {
         // 複数のファイルを並行して読み込み、全ての完了を待つ
-        const [kanjiDict, kanaDict, tutorialsDict, gameDict, kanjiProblem, kanaProblem, tutorialProblem, gameData] = await Promise.all([
+        const [kanjiDict, kanaDict, tutorialsDict, gameDict, gamePowupDict] = await Promise.all([
             initialDicload("./dictionary-local.txt"),
             initialDicload("./dictionary-kana.txt"),
             initialDicload("./tutorial-dic.txt"),
-            initialDicload("./invade-dic.txt"),
-            initialProbelmLoad("./names.txt"),
-            initialProbelmLoad("./kana.txt"),
-            initialProbelmLoad("./tutorial.txt"),
-            initialProbelmLoad("./invade.txt")
-
+            initialDicload("./invade-base-dic.txt"),
+            initialDicload("./invade-powup-dic.txt")
         ]);
 
         // 読み込んだデータを格納
-
         dictionaries.kanji = kanjiDict;
         dictionaries.katakana = kanaDict;
         dictionaries.tutorial = tutorialsDict;
         dictionaries.game = gameDict;
+        gamePowUpdict = gamePowupDict;
         dictionary = dictionaries[currentDictionary];
+
+        const [kanjiProblem, kanaProblem, tutorialProblem, gameProblem] = await Promise.all([
+            initialProbelmLoad("./names.txt"),
+            initialProbelmLoad("./kana.txt"),
+            initialProbelmLoad("./tutorial.txt"),
+            initialProbelmLoad("./invade.txt")
+        ]);        
 
         targetData["names-kanji"] = kanjiProblem;
         targetData["names-katakana"] = kanaProblem;
         targetData["tutorial"] = tutorialProblem;
-        targetData["game"] = gameData;
+        targetData["game"] = gameProblem.map(list => ({...list}));
+
+        originalDataset["names-kanji"] = kanjiProblem.map(list => ({...list}));
+        originalDataset["names-katakana"] = kanaProblem.map(list => ({...list}));
+        originalDataset["tutorial"] = tutorialProblem.map(list => ({...list}));
+        originalDataset["game"] = gameProblem.map(list => ({...list}));
 
         console.log("全ての辞書の読み込みが完了しました");
 
@@ -383,9 +394,8 @@ function switchDataSet(dataSet) {
         }
     });
     
-    if (dataSet === "tutorial"){
+    if (dataSet === "tutorial" || dataSet === "game"){
         dictionaryTypeSelect.disabled = true;
-        console.log("ok");
     } else {
         dictionaryTypeSelect.disabled = false;
     }
@@ -613,7 +623,7 @@ function goToNextTarget(value) {
 
 // 入力表示の更新
 function updateDisplay() {
-    inputDisplay.textContent = `再変換:${reConAble} マッチ:${matchCount} | 前回:${lastFixKey} - 現在:${inputBuffer}`;
+    inputDisplay.textContent = `再変換:${reConAble} マッチ:${matchCount} idx: ${checkingIndex}  comp:${currentCompletedTarget}| 前回:${lastFixKey} - 現在:${inputBuffer}`;
 }
 
 function messageDisplay(text) {
@@ -675,13 +685,38 @@ function checkAndConvert() {
             inputBuffer = "";
             matchCount = 0;
             reConAble = 1;
-            currentCompletedTarget = currentCompletedTarget.slice(0, -dictionary[lastFixKey].length);
+
+
+            const cleanText = currentTarget.text.replace(/\s+/g, '');
+    
+            // 現在のインデックス位置を取得
+            let currentIndex = checkingIndex;
+            
+            // 入力値のマッチ位置を検索
+            const indices = [];
+            let index = cleanText.indexOf(value);
+                while (index !== -1) {
+                indices.push(index);
+                index = cleanText.indexOf(value, index + 1);
+            }
+        
+            let matchPosition = -1;
+            for (const idx of indices) {
+                if (idx <= checkingIndex && idx + value.length > checkingIndex) {
+                    matchPosition = idx;
+                }
+            }
+        
+            // マッチが見つかり、かつマッチ位置が現在のインデックス以前の場合
+            if (matchPosition !== -1 && matchPosition <= currentIndex) {
+                currentCompletedTarget = currentCompletedTarget.slice(0, -dictionary[lastFixKey].length);
+            }
         } else {
             // 初回マッチ (2 or 3 文字)
             matchCount += 1;
         }
 
-        currentCompletedTarget += value;
+//        currentCompletedTarget += value;
         lastFixKey2 = lastFixKey;
         lastFixKey = key;
     } else {
@@ -691,7 +726,9 @@ function checkAndConvert() {
             matchCount = 0;
         }
     }
-    checkCompletedChars(value);
+    if (value){
+        checkCompletedChars(value);
+    }
     updateDisplay();
 }
 
@@ -734,7 +771,7 @@ function checkCompletedChars(value) {
             completedReadings.push(i);
         }
 
-//        currentCompletedTarget += value;
+        currentCompletedTarget += value;
         const checkedEvent = checkEvent(value);
         checkingIndex = matchPosition + value.length;
         
@@ -754,28 +791,23 @@ function checkCompletedChars(value) {
             }
         }else {
             eventHandle(checkedEvent);
-
-/*            
-            const messageEvent = checkedEvent.find(item => item.type ==="message");
-            const jumpEvent = checkedEvent.find(item => item.type ==="jump");
-            const repackEvent = checkedEvent.find(item => item.type ==="repack");
-
-            if (messageEvent){
-                showMessage(messageEvent.content, messageEvent.mtimer);
-            }
-            if (jumpEvent){
-                goToNextTarget(jumpEvent.next);
-            }
-            if (repackEvent){
-                dataRepacking();
-            }
-*/
         }
     }
 }
 
 
 function eventHandle(checkedEvent){
+    for (eventData of checkedEvent) {
+        if (eventData.type === "message"){
+            showMessage(eventData.content, eventData.mtimer);
+        } else if (eventData.type === "jump"){
+            goToNextTarget(eventData.next);
+        } else if (eventData.type === "repack"){
+            dataRepacking(eventData);
+        }    
+    }
+
+/*    
     const messageEvent = checkedEvent.find(item => item.type ==="message");
     const jumpEvent = checkedEvent.find(item => item.type ==="jump");
     const repackEvent = checkedEvent.find(item => item.type ==="repack");
@@ -787,11 +819,85 @@ function eventHandle(checkedEvent){
         goToNextTarget(jumpEvent.next);
     }
     if (repackEvent){
-        dataRepacking();
+        dataRepacking(repackEvent);
     }    
+*/
+
 }
 
-function dataRepacking() {
+function dataRepacking(repackEvent) {
+    const originalData = originalDataset[currentDataSet];
+    const filter = new RegExp("^" + repackEvent.filter + "$");
+
+    targetData[currentDataSet].length = 0;
+    targetData[currentDataSet] = structuredClone (originalDataset[currentDataSet]);
+    target = targetData[currentDataSet];
+
+    const placeholderMap = {};
+    const placeholderPattern = /@([a-z]?[0-9]+)/g;
+
+    // まず全てのプレースホルダーを集める
+    for (const item of target) {
+        // textフィールドからプレースホルダーを抽出
+        if (item.text) {
+            const matches = item.text.match(placeholderPattern);
+            if (matches) {
+                for (const match of matches) {
+                    if (!placeholderMap[match]) {
+                        // ランダムに1文字の漢字を選択して割り当てる
+                        keys = Object.keys(dictionary);
+                        const randomIndex = Math.floor(Math.random() * keys.length);
+                        placeholderMap[match] = dictionary[keys[randomIndex]];
+                    }
+                }
+            }
+        }
+        
+        // eventsフィールドからプレースホルダーを抽出
+        if (item.events && Array.isArray(item.events)) {
+            for (const event of item.events) {
+                if (event.condition) {
+                    const matches = event.condition.match(placeholderPattern);
+                    if (matches) {
+                        for (const match of matches) {
+                            if (!placeholderMap[match]) {
+                                // ランダムに1文字の漢字を選択して割り当てる
+                                keys = Object.keys(dictionary);
+                                const randomIndex = Math.floor(Math.random() * keys.length);
+                                placeholderMap[match] = dictionary[keys[randomIndex]];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    for (const item of target){
+        if (filter.test(item.id)){
+            if (item.text) {
+                item.text = item.text.replace(placeholderPattern, (match) => {
+                  return placeholderMap[match] || match; // マッピングがない場合は元の値を保持
+                });
+              }            
+
+            // eventsフィールドの処理
+            if (item.events && Array.isArray(item.events)) {
+                for (let j = 0; j < item.events.length; j++) {
+                    const event = item.events[j];
+                    
+                    // conditionフィールドの処理
+                    if (event.condition) {
+                        event.condition = event.condition.replace(placeholderPattern, (match) => {
+                        return placeholderMap[match] || match;
+                        });
+                    }
+                }
+            }
+            console.log(item);
+        }
+    }
 
 }
 
@@ -850,7 +956,7 @@ function backspaceBuffer() {
 }
 
 // 再変換処理
-function reConvert() {
+function reConvert1() {
     if (reConAble === 1) {
         const followPart = inputBuffer;
         const redoPart = lastFixKey.substring(lastFixKey2.length);
@@ -864,6 +970,8 @@ function reConvert() {
         
         // 変換前の状態に戻す
         inputField.value = textBefore + lastFixValue2 + redoPart + followPart + textAfter;
+
+        currentCompletedTarget += lastFixValue2;
         
         // カーソル位置の調整
         const newPosition = textBefore.length + lastFixValue2.length + redoPart.length + followPart.length;
@@ -885,6 +993,68 @@ function reConvert() {
         lastFixKey2 = lastFixKey2Backup;
         reConAble = 0;
         
+        updateDisplay();
+    }
+}
+
+// 再変換処理
+function reConvert() {
+    if (reConAble === 1) {
+        const followPart = inputBuffer;
+        const redoPart = lastFixKey.substring(lastFixKey2.length);
+        const lastFixValue = dictionary[lastFixKey];
+        const lastFixValue2 = dictionary[lastFixKey2];
+        
+        // 現在のカーソル位置を取得
+        const cursorPos = inputField.selectionStart;
+        const textBefore = inputField.value.substring(0, cursorPos - lastFixValue.length - followPart.length);
+        const textAfter = inputField.value.substring(cursorPos);
+
+        // 変換前の状態に戻す
+        inputField.value = textBefore + lastFixKey2;
+        inputBuffer = lastFixKey2;
+
+        if (currentCompletedTarget.endsWith(lastFixValue)){
+            currentCompletedTarget = currentCompletedTarget.slice(0, -lastFixValue.length);
+            checkingIndex -= lastFixValue.length;
+        }else if(currentCompletedTarget.endsWith(lastFixValue2)){
+            currentCompletedTarget = currentCompletedTarget.slice(0, -lastFixValue2.length);
+            checkingIndex -= lastFixValue2.length;
+        }
+
+        if (checkingIndex < 0){
+            checkingIndex = 0;
+        }
+
+        checkAndConvert();
+
+        clearBuffer();
+        inputField.value += redoPart + followPart;
+        inputBuffer = redoPart + followPart;
+
+//        currentCompletedTarget += lastFixValue2;
+        
+        // カーソル位置の調整
+        const newPosition = textBefore.length + lastFixValue2.length + redoPart.length + followPart.length;
+        inputField.setSelectionRange(newPosition, newPosition);
+
+        // 変換履歴を一時保存
+        const lastFixKeyBackup = lastFixKey;
+        const lastFixKey2Backup = lastFixKey2;
+        clearBuffer();
+        
+        // 入力バッファを更新して変換
+        inputBuffer = redoPart + followPart;
+        checkAndConvert();
+        
+        // 変換履歴を更新
+        if (lastFixKey === lastFixKeyBackup) {
+            lastFixKey = lastFixKey2Backup; // 後続の変換なし
+        }
+        lastFixKey2 = lastFixKey2Backup;
+        reConAble = 0;
+
+        inputField.value += textAfter;
         updateDisplay();
     }
 }
