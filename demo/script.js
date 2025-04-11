@@ -20,6 +20,7 @@ let isBackspacePressed = false; // バックスペース検出フラグ
 let currentMessageTimer = null; // タイマーIDを保持する変数
 let nextTimerID = null;
 let isProcessing = false;   // 次の問題表示待ち (タブ切り替え用)
+let gameData = {"gameOpen":0};
 
 // 入力対象データ
 let targetData = {
@@ -81,7 +82,7 @@ let infoForDataset = {
 };
 
 // 許可する type のリスト
-const ALLOWED_TYPES = ["message", "jump", "repack"];        
+const ALLOWED_TYPES = ["message", "jump", "repack", "bufferClear", "countup", "calc"];        
 
 let currentDataSet = "names-kanji"; // 現在のターゲットデータセット
 let currentTargetIndex = 0;     // 現在の入力対象インデックス (どこまで進んだか)
@@ -161,7 +162,7 @@ function initialProbelmLoad(filePath) {
             return result;
         })
         .catch(error => {
-            console.error('ファイル読み込みエラー:', error);
+            console.error('ファイル読み込みエラー:', error, filePath);
         });
 }
 
@@ -230,12 +231,14 @@ function processUserData(userData) {
     let timer = 0;
     try {
         if (userData.timer){
-            if (userData.timer >= 0){
+            if (typeof userData.timer === "number" && userData.timer >= 0){
+                timer = userData.timer;
+            } else if (typeof userData.timer === "string"){
                 timer = userData.timer;
             }
         }
     } catch (e) {
-        id = 0;
+        timer = 0;
     }
 
     if (!userData.text || !Array.isArray(userData.events)) {
@@ -409,6 +412,16 @@ function generateReading(text) {
 
     const cleanText = text.replace(/\s+/g, '');
     const n = cleanText.length;
+
+    if (cleanText === ""){
+        return {
+            reading: "",
+            value: "",
+            completed: false,
+            startIndex: 0,
+            endIndex: 0
+        };
+    }
     
     // dp[i] = テキストの位置iまでの可能なすべての区切り方
     const dp = new Array(n + 1).fill().map(() => []);
@@ -580,6 +593,14 @@ function showNextTarget() {
     let newtimer = 0;
     try {
         newtimer = currentTarget.timer;
+        if (typeof newtimer === "string"){
+            if (newtimer.indexOf("@") !== -1){
+                key = newtimer.split("@")[1];
+                if (/^[a-zA-Z0-9]+$/.test(key)) { // Check if the key contains only alphanumeric characters
+                    newtimer = gameData[key] !== undefined ? parseInt(gameData[key]) : 0;
+                }
+            }
+        }
     } catch (err) {
         newtimer = 0
     }
@@ -589,7 +610,16 @@ function showNextTarget() {
 
     if (newtimer > 0) {
         nextTimerID = setTimeout(() => {
+
+            const inputFieldBackup = inputField.value; 
+            const inputBufferBackup = inputBuffer
+
             goToNextTarget();
+
+            inputField.value = inputFieldBackup;
+            inputBuffer = inputBufferBackup;
+
+//            goToNextTarget();
         }, newtimer);
     }
     
@@ -609,7 +639,9 @@ function goToNextTarget(value) {
         currentTargetIndex = (currentTargetIndex + 1) % targetData[currentDataSet].length;
         infoForDataset[currentDataSet].probIndex = currentTargetIndex
         showNextTarget();
-        showMessage("第 " + (currentTargetIndex + 1) + " 問 (" + targetData[currentDataSet].length + " 問中)", 0);
+        if (currentDataSet !== "game"){
+            showMessage("第 " + (currentTargetIndex + 1) + " 問 (" + targetData[currentDataSet].length + " 問中)", 0);
+        }
     } else {
         currentTargetIndex = value;
         infoForDataset[currentDataSet].probIndex = value;
@@ -782,7 +814,9 @@ function checkCompletedChars(value) {
         if (!checkedEvent || checkedEvent.length === 0) {
             // すべての読みが完了したかチェック
             if (completedReadings.length === currentTargetReadings.length) {
-                showMessage("入力完了！ 次の問題に進みます。");
+                if (currentDataSet !== "game"){
+                    showMessage("入力完了！ 次の問題に進みます。");
+                }
                 isProcessing = true;
                 setTimeout(() => {
                     goToNextTarget();
@@ -795,15 +829,88 @@ function checkCompletedChars(value) {
     }
 }
 
+function countUp(eventData){
+
+    const parts = eventData.target.split(":");
+
+    // コロンの後が数値であることを検査する
+    if (parts.length > 1 && /^\d+$/.test(parts[1])) {
+        const value = parseInt(parts[1], 10);
+        const counter = parts[0];
+        
+        if (!(counter in gameData)){
+            gameData[counter] = parseInt(value);
+        } else {
+            gameData[counter] += parseInt(value);
+        }
+    }
+}
+
+function calculation(eventData){
+    const parts = eventData.target.split(":");
+
+    // コロンの後が「四則演算子＋数値」であることを検査する
+    if (parts.length > 1 && /^[+*-/%]\d+(\.\d+)?$/.test(parts[1])) {
+        const operator = parts[1].charAt(0);
+        const numberPart = parts[1].substring(1);
+        const value = Number(numberPart);
+        const key = parts[0];
+
+            // 数値変換が有効か確認
+        if (isNaN(value)) {
+            throw new Error("無効な数値です: " + numberPart);
+        }
+    
+        // 演算子に基づいて計算を実行
+        if(key in gameData){
+            switch (operator) {
+                case '+':
+                    gameData[key] += value;
+                    break;
+                case '-':
+                    gameData[key] -= value;
+                    break;
+                case '*':
+                    gameData[key] *= value;
+                    break;
+                case '/':
+                    if (value === 0) {
+                        throw new Error("0で除算できません");
+                    }
+                    gameData[key] /= value;
+                    break;
+                default:
+                    throw new Error("無効な演算子です: " + operator);
+            }        
+        } else {
+            console.log("変数が定義されていません")
+        }
+    }    
+}
 
 function eventHandle(checkedEvent){
-    for (eventData of checkedEvent) {
+    for (const eventData of checkedEvent) {
         if (eventData.type === "message"){
+            const matches = eventData.content.match(/@\w+/g) || [];
+//            const extractedWords = matches.map(word => word.trim());
+            matches.forEach(word => {
+                const key = word.trim().slice(1); // Remove '@' from the word
+                if (/^[a-zA-Z0-9]+$/.test(key)) { // Check if the key contains only alphanumeric characters
+                    const replacement = gameData[key] !== undefined ? gameData[key] : "(未設定)";
+                    eventData.content = eventData.content.replace(word, replacement);
+                }
+            });
             showMessage(eventData.content, eventData.mtimer);
         } else if (eventData.type === "jump"){
             goToNextTarget(eventData.next);
         } else if (eventData.type === "repack"){
             dataRepacking(eventData);
+        } else if (eventData.type === "bufferClear"){
+            clearInputField(eventData);
+        } else if (eventData.type === "countup"){
+            countUp(eventData);
+        } else if (eventData.type === "calc"){
+            calculation(eventData);
         }    
     }
 
@@ -928,6 +1035,12 @@ function checkEvent(value) {
                     triggered.push( {type: "jump", next:next} );
                 } else if (typingEvent.type === "repack") {
                     triggered.push({"type": "repack", "filter": typingEvent.filter});
+                } else if (typingEvent.type === "bufferClear"){
+                    triggered.push({"type": "bufferClear"});
+                } else if (typingEvent.type === "countup"){
+                    triggered.push({"type": "countup", "target": typingEvent.target});
+                } else if (typingEvent.type === "calc"){
+                    triggered.push({"type": "calc", "target": typingEvent.target});
                 }
             }
         }
