@@ -6,7 +6,12 @@ direct-input23.ahk は、IME を使用せずに漢字を入力できる AutoHotK
 
 使い方および詳細については、[note の記事](https://note.com/kouie/n/nfeccadad26a5) をご覧ください (note 記事と異なる動作がある場合は、本 Readme を参照してください)。
 
+AutoHotkey を利用していない方向けに [デモサイト](https://kouie.github.io/di23demo/)  を用意しています。AutoHotkey を利用している方も動作確認にご利用ください (デモサイトのリポジトリは [https://github.com/kouie/di23demo](https://github.com/kouie/di23demo) です)。
+
+
 ## 最近の更新
+
+(2025/4/15) [デモサイト](https://kouie.github.io/di23demo/)を公開しました。コア機能 (変換・再変換) の動作を html＋Javascript で再現しています (デモサイトのリポジトリは [こちら](https://github.com/kouie/di23demo))。
 
 (2025/1/1) 最新のバージョンは `1.3.0` です。このバージョンでは、次の機能が追加されました。
 
@@ -405,4 +410,4 @@ set=1
 
 ## ライセンス
 
-このリポジトリの内容は [MT License](./LICENSE) です。
+このリポジトリの内容は [MIT License](./LICENSE) です。
