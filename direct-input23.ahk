@@ -661,8 +661,8 @@ LoadJoyoKanji() {
 	global dictionaryJyoyoKanji
 
 ; 個人設定 (辞書名)
-;    Loop, Read, "dictionary-jyoyo-jinmei.tsv"
-	Loop Read, "MergedKanjiDict-jyoyo-name-jis1-userAll.tsv"
+    Loop Read, "dictionary-jyoyo-jinmei.tsv"
+;	Loop Read, "MergedKanjiDict-jyoyo-name-jis1-userAll.tsv"
     {
         ; タブで分割
         parts := StrSplit(A_LoopReadLine, A_Tab)
