@@ -660,7 +660,9 @@ LoadJoyoKanji() {
 	; Loop, Read を使ってテキストファイルを1行ずつ処理
 	global dictionaryJyoyoKanji
 
-    Loop Read, "dictionary-jyoyo-jinmei.tsv"
+; 個人設定 (辞書名)
+;    Loop, Read, "dictionary-jyoyo-jinmei.tsv"
+	Loop Read, "MergedKanjiDict-jyoyo-name-jis1-userAll.tsv"
     {
         ; タブで分割
         parts := StrSplit(A_LoopReadLine, A_Tab)
@@ -1010,6 +1012,22 @@ $Enter:: ;HK68_Enter()
 		UpdateDisplay()
 	}
 }
+
+; 個人設定
+vk1D::
+{
+	SendInput("{Left}")
+	clearBuffer()
+	UpdateDisplay()
+}
+
+vk1C::
+{
+	SendInput("{Right}")
+	clearBuffer()
+	UpdateDisplay()
+}
+; ここまで
 
 $Space:: ;HK69_Space()
 {
@@ -1443,6 +1461,13 @@ IME_SET(SetSts, WinTitle:="A")    {
 }
 
 #HotIf !WinActive("ahk_group directinput")
+
+; 個人設定
+^$h::
+{
+	SendInput("{BS}")
+}
+; ここまで
 
 #SuspendExempt
 ; 変換システムを一時停止 
