@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>漢字入力システムデモ</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>漢字入力システムデモ</h1>
+    
+    <div class="container">
+        <div class="tab-group">
+            <div class="tab active" data-target="names-kanji">姓名（漢字）</div>
+            <div class="tab" data-target="names-katakana">姓名（カタカナ）</div>
+<!--            <div class="tab" data-target="addresses">住所</div> -->
+            <div class="tab" data-target="tutorial">チュートリアル</div>
+            <div class="tab" data-target="game">ゲーム</div>
+        </div>
+        
+        <div class="input-section">
+            <div class="target-display">
+                <div id="targetText">入力対象がここに表示されます</div>
+                <div class="reading" id="targetReading">読みがここに表示されます</div>
+            </div>
+            
+            <div class="input-area">
+                <div class="input-display" id="inputDisplay">入力状態: 待機中</div>
+                <div class="message-display" id="messageArea">下段の読みを入力してください</div>
+                <textarea id="inputField" placeholder="ここに入力してください..."></textarea>
+            </div>
+
+            <div class="dictionary-selector">
+                <label for="dictionaryType">選択中の辞書: </label>
+                <select id="dictionaryType">
+                    <option value="kanji">漢字辞書</option>
+                    <option value="katakana">カタカナ辞書</option>
+                </select>
+            </div>
+
+            <div class="button-group" >
+                <button id="nextTarget" class="secondary">更新 (F5)</button>
+                <button id="clearInput" class="danger">クリア (Esc)</button>
+                <button id="toggleSystem" class="toggle-button">システム停止/再開 (Ctrl+Q)</button>
+            </div>
+        </div>
+        
+        <div class="shortcuts">
+            <h3>ショートカットキー</h3>
+            <ul>
+                <li><strong>F2</strong>: 現在の入力対象をスキップ</li>
+                <li><strong>Backspace / Ctrl+H</strong>: 1文字削除</li>
+                <li><strong>Esc</strong>: 入力欄をクリア</li>
+                <li><strong>Ctrl+L / Ctrl+K</strong>: 再変換</li>
+                <li><strong>Ctrl+Q</strong>: システム停止/再開</li>
+            </ul>
+        </div>
+
+        <div class="settings-header">
+            <button id="toggleSettings" class="toggle-settings-button">
+                <span class="toggle-icon">▼</span>
+            </button>
+            <span class="settings-title">設定</span>
+        </div>
+
+        <div class="settings-container">
+            <div class="dictionary-upload">
+                <p>独自の辞書ファイルを読み込む</p>
+                <div class="file-input-group">
+                    <input type="file" id="dictionaryFile" accept=".txt">
+                    <div class="name-input">
+                        <label for="dictionaryName">辞書名:</label>
+                        <input type="text" id="dictionaryName" placeholder="辞書の名前（省略可）">
+                    </div>
+                    <button id="loadDictionary" class="secondary">辞書を読み込む</button>
+                </div>
+            </div>            
+            
+            <div class="problems-upload">
+                <p>独自の問題ファイルを読み込む</p>
+                <div class="file-input-group">
+                    <input type="file" id="problemsFile" accept=".txt,.csv">
+                    <div class="name-input">
+                        <label for="problemsName">問題セット名:</label>
+                        <input type="text" id="problemsName" placeholder="問題セットの名前（省略可）">
+                    </div>
+                    <button id="loadProblems" class="secondary">問題を読み込む</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="footer">
+        <div>© 2025 kouie
+            このデモサイトおよびそのコードは非商用目的でのみ利用可能です。
+            <p xmlns:cc="http://creativecommons.org/ns#" >This work by <span property="cc:attributionName">kouie</span> is licensed under <a href="https://creativecommons.org/licenses/by-nc/4.0/?ref=chooser-v1" target="_blank" rel="license noopener noreferrer" style="display:inline-block;">CC BY-NC 4.0<img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/cc.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/by.svg?ref=chooser-v1" alt=""><img style="height:22px!important;margin-left:3px;vertical-align:text-bottom;" src="https://mirrors.creativecommons.org/presskit/icons/nc.svg?ref=chooser-v1" alt=""></a></p> 
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    
+</body>
+</html>
+        
