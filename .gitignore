@@ -2,4 +2,6 @@
 /utils
 /venv
 !/dictionary-hirakata.txt
-/dic_backup
+dic_backup/*
+!dic_backup/.gitignore
+/demo
