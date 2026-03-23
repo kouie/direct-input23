@@ -38,10 +38,12 @@ global inputMode := "kanji"
 global yomiBuffer := ""
 global dictionaryJyoyoKanji := []
 global lookupDisplay := ""
+global navigation := ""
 global lookupResults := []
 global lookingActive := 0
 global gui1 := ""
 global lookupPanel := ""
+global lookupResultOffset := 0
 
 ; GUIの作成
 GUI_init() {
@@ -59,7 +61,10 @@ GUI_init() {
 	mygui := Gui("+AlwaysOnTop +ToolWindow -Caption")
 	mygui.SetFont("s14")
 	mygui.BackColor := "a0e0a0"
-	mygui.Add("Text", "vlookupDisplay w50 h550")
+	mygui.Add("Text", "vlookupDisplay w50 h171")
+	mygui.Add("Text", "y+5 w50 h1 BackgroundGray")
+	mygui.Add("Text", "vnavigation y+5 h19", "次ページ")
+	
 	WinSetTransparent(200, mygui)
 	lookupPanel := mygui
 }
@@ -660,8 +665,8 @@ LoadJoyoKanji() {
 	; Loop, Read を使ってテキストファイルを1行ずつ処理
 	global dictionaryJyoyoKanji
 
-    Loop Read, "dictionary-jyoyo-jinmei.tsv"
-    {
+    Loop Read, "dictionary-jyoyo-jinmei-jis12.tsv"
+	{
         ; タブで分割
         parts := StrSplit(A_LoopReadLine, A_Tab)
         
@@ -674,13 +679,13 @@ LoadJoyoKanji() {
 
 lookUpDict(keywards, &targetDict){
 	; 入力文字をスペース区切りで配列にする（例: ["あい", "あわ"]）
-	global dictionaryJyoyoKanji
+	global dictionaryJyoyoKanji, lookupResultOffset
 	
 	queryWords := StrSplit(keywards, A_Space)
 		
 	results := []
 
-	; 常用漢字リストを全件検索（2000件程度なら一瞬で終わります）
+	; 常用漢字リストを全件検索
 	for index, data in dictionaryJyoyoKanji {
 		isMatch := true
 		paddedyomi :=  " " . data.yomi . " "
@@ -706,14 +711,15 @@ lookUpDict(keywards, &targetDict){
 		
 		; すべてのワードにマッチしたら結果に追加
 		if (isMatch) {
+			lookupResultOffset := 0
 			results.Push(data.kanji)
 			if (data.kyuuji != ""){
 				results.Push(data.kyuuji)
 			}
-			if (results.Length > 10){
-				results.Push("...")
-				break
-			}
+;			if (results.Length >=19){
+;				results.Push("...")
+;				break
+;			}
 		}
 	}
 
@@ -722,20 +728,32 @@ lookUpDict(keywards, &targetDict){
 
 
 showLookupResule(results) {
-	global lookupPanel, lookupResults
+	global lookupPanel, lookupResults,navigation
 
 	if(results = ""){
 		lookupPanel.Hide()
 	}else{
 		lookupPanel["lookupDisplay"].Value := results
+		lookupPanel["navigation"].Value := ""
+		
 		GetCaretPos(&locx, &locy, &w, &h)
 		locy += 30
 
+		pHeight := 0
 		lowNum := lookupResults.Length
-		if (lowNum > 30){
-			lowNum := 30
+		if (lowNum > 9){
+			lowNum := 10
+			pHeight += 10
+			if (lookupResultOffset = 0){
+				lookupPanel["navigation"].Value := "→"
+			}else {
+				lookupPanel["navigation"].Value := "← / →"
+			}
 		}
-		pHeight := lowNum * 19 + 19
+		pHeight += lowNum * 19 + 22	
+		if (locy + pHeight > A_ScreenHeight - 50){
+			locy := locy - 30 - pHeight - 19
+		}
 		lookupPanel.Show("NoActivate x" locx " y" locy " h" pHeight)
 	}
 }
@@ -761,7 +779,7 @@ IsConsonant(s) {
 }
 
 lookupRefference(){
-	global yomiBuffer, inputBuffer, lookupPanel, lookingActive, dictionaryJyoyoKanji, lookupResults
+	global yomiBuffer, inputBuffer, lookupPanel, lookingActive, dictionaryJyoyoKanji, lookupResults, lookupResultOffset
 
 	lookingActive := 1
 ;	if (yomiBuffer = "" or IsConsonant(yomiBuffer) = 1) {
@@ -777,7 +795,7 @@ lookupRefference(){
 	resultsStrings := ""
 	if (lookupResults.Length > 0) {
 		for index, element in lookupResults{
-			if (index > 30) {
+			if (index > 10) {
 				break
 			}
 				resultsStrings .= index . ": " . element . "`n"
@@ -792,11 +810,12 @@ lookupRefference(){
 }
 
 lookupClear(){
-	global lookupPanel, gui1, yomiBuffer, inputMode
+	global lookupPanel, gui1, yomiBuffer, inputMode, lookupResults
 
 	lookupPanel.Hide()
 	gui1.BackColor := "E0E0E0"
 	yomiBuffer := ""
+	lookupResults := []
 	inputMode := "kanji"
 }
 
@@ -879,6 +898,7 @@ $8::
 $9::
 $.::
 $-::
+$/::
 {
 	global inputBuffer, inputMode, yomiBuffer
 
@@ -1259,13 +1279,16 @@ F7::
 
 ^$Enter::
 {
+	global lookupResultOffset
+
 	if (inputMode != "lookup"){
 		key := "^{Enter}"
 		SendInput(key)
 			return
 	}
-	
-	result := confirmSuggest(1)	
+
+	number := 1 + lookupResultOffset
+	result := confirmSuggest(number)	
 	if (result = 1){
 		lookupClear()
 		clearBuffer()
@@ -1273,6 +1296,7 @@ F7::
 	}
 }
 
+; 補完候補を選択
 ^$1::
 ^$2::
 ^$3::
@@ -1283,7 +1307,7 @@ F7::
 ^$8::
 ^$9::
 {
-; 補完候補を選択
+	global lookupResultOffset
 
 	if (inputMode != "lookup"){
 		key := "^" . SubStr(A_ThisHotkey, 3)
@@ -1291,7 +1315,9 @@ F7::
 			return
 	}
 	key := SubStr(A_ThisHotkey, 3)
-	result := confirmSuggest(key)	
+	number := key + lookupResultOffset
+	result := confirmSuggest(number)	
+;	result := confirmSuggest(key)
 	if (result = 1){
 		lookupClear()
 		clearBuffer()
@@ -1317,12 +1343,131 @@ F7::
 			return
 	}
 	key := SubStr(A_ThisHotkey, 4)
-	result := confirmSuggest(key)	
+	number := key + lookupResultOffset
+	result := confirmSuggest(number)
 	if (result = 1){
 		lookupClear()
 		clearBuffer()
 		UpdateDisplay()
 	}	
+}
+
+Down::
+{
+	global lookupResults, lookupResultOffset
+	if (inputMode == "lookup" and  lookupResults.Has(1) != 0){
+		lookupResultOffset += 1
+		if (lookupResultOffset >= lookupResults.Length){
+			lookupResultOffset := 0
+		}
+
+		resultsStrings := ""
+		if (lookupResults.Length > 0) {
+			for index, element in lookupResults{
+				if (index <= lookupResultOffset){
+					continue
+				}
+				if (index - lookupResultOffset > 10) {
+					break
+				}
+					resultsStrings .= index - lookupResultOffset . ": " . element . "`n"
+			}
+			Trim(resultsStrings, "`n")
+		}
+		
+		showLookupResule(resultsStrings)
+	} else {
+		SendInput("{Down}")
+	}
+}
+
+Up::
+{
+	global lookupResultOffset, lookupResults
+
+	if (inputMode == "lookup" and  lookupResults.Has(1) != 0){
+		lookupResultOffset -= 1
+		if (lookupResultOffset < 0){
+			lookupResultOffset := 0
+		}
+	
+		resultsStrings := ""
+		if (lookupResults.Length > 0) {
+			for index, element in lookupResults{
+				if (index <= lookupResultOffset){
+					continue
+				}
+				if (index - lookupResultOffset > 10) {
+					break
+				}
+					resultsStrings .= index - lookupResultOffset . ": " . element . "`n"
+			}
+			Trim(resultsStrings, "`n")
+		}
+		showLookupResule(resultsStrings)	
+	} else {
+		SendInput("{Up}")
+	}
+}
+
+Right::
+{
+	global lookupResultOffset, lookupResults
+	if (inputMode == "lookup" and  lookupResults.Has(1) != 0){
+
+			lookupResultOffset += 9
+		if (lookupResultOffset > lookupResults.Length){
+			lookupResultOffset := 0
+		}
+
+		resultsStrings := ""
+		if (lookupResults.Length > 0) {
+			for index, element in lookupResults{
+				if (index <= lookupResultOffset){
+					continue
+				}
+				if (index - lookupResultOffset > 10) {
+					break
+				}
+					resultsStrings .= index - lookupResultOffset . ": " . element . "`n"
+			}
+			Trim(resultsStrings, "`n")
+		}
+		
+		showLookupResule(resultsStrings)	
+	} else {
+		SendInput("{Right}")
+	}
+}
+
+Left::
+{
+	global lookupResultOffset, lookupResults
+	if (inputMode == "lookup" and  lookupResults.Has(1) != 0){
+
+			lookupResultOffset -= 9
+		if (lookupResultOffset < 0){
+			lookupResultOffset := 0
+		}
+
+		resultsStrings := ""
+		if (lookupResults.Length > 0) {
+			for index, element in lookupResults{
+				if (index <= lookupResultOffset){
+					continue
+				}
+				if (index - lookupResultOffset > 10) {
+					break
+				}
+					resultsStrings .= index - lookupResultOffset . ": " . element . "`n"
+			}
+			Trim(resultsStrings, "`n")
+		}
+		
+		showLookupResule(resultsStrings)	
+	} else {
+		SendInput("{Left}")
+	}
 }
 
 ; 変換履歴を出力 (タイマー処理)
