@@ -1031,22 +1031,6 @@ $Enter:: ;HK68_Enter()
 	}
 }
 
-; 個人設定
-vk1D::
-{
-	SendInput("{Left}")
-	clearBuffer()
-	UpdateDisplay()
-}
-
-vk1C::
-{
-	SendInput("{Right}")
-	clearBuffer()
-	UpdateDisplay()
-}
-; ここまで
-
 $Space:: ;HK69_Space()
 {
 	global	inputMode, yomiBuffer
@@ -1606,13 +1590,6 @@ IME_SET(SetSts, WinTitle:="A")    {
 }
 
 #HotIf !WinActive("ahk_group directinput")
-
-; 個人設定
-^$h::
-{
-	SendInput("{BS}")
-}
-; ここまで
 
 #SuspendExempt
 ; 変換システムを一時停止 
