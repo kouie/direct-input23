@@ -999,6 +999,8 @@ $@::
 		inputBuffer .= key1
 		UpdateDisplay()
 		if (inputMode == "kanji"){
+			key1 := ""
+			SendInput("{BS 1}") ; @ の場合
 			if(backupBuffer == ""){
 				; 再変換直後 or 起動直後
 				inputBuffer := key1
