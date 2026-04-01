@@ -45,6 +45,14 @@ global gui1 := ""
 global lookupPanel := ""
 global lookupResultOffset := 0
 
+global modeColor := Map()
+modeColor["kanji"] := Map("bg","E0E0E0", "text", "black")
+modeColor["hira"] := Map("bg","F0C080", "text", "black")
+modeColor["Hira"] := Map("bg","F0C080", "text", "A06060")
+modeColor["kata"] := Map("bg","F0E080", "text", "black")
+modeColor["lookup"] := Map("bg","80C080", "text", "black")
+modeColor["eisu"] := Map("bg","606060", "text", "white")
+
 ; GUIの作成
 GUI_init() {
 	global gui1, lookupPanel
@@ -554,7 +562,7 @@ ConvertKana(targetBuffer, hiraKata){
 ; カナ変換(リアルタイム) 前方マッチで
 ;  文字列の先頭にあるアルファベット以外は無視する
 ConvertKana_realTime(targetBuffer, currentBuffer, hiraKata){
-	global dictionaryKana
+	global dictionaryKana, lastfixKey
 	workingBuffer := targetBuffer
 
 	kanaset := "hira"
@@ -586,6 +594,7 @@ ConvertKana_realTime(targetBuffer, currentBuffer, hiraKata){
 		SendInput("{BS " bslength "}")
 		SendInput(value)
 		clearbuffer()
+		lastfixKey := key
 		updatedBuffer := SubStr(currentBuffer, 1, StrLen(currentBuffer) - bslength) . value
 	} else {
 		updatedBuffer := currentBuffer
@@ -613,14 +622,15 @@ kickandConvert(){
 		bslength := StrLen(targetBuffer)
 		SendInput("{BS " bslength "}")
 
-		clearBuffer()
-		Loop Parse, targetBuffer
-		{
-			inputBuffer .= A_LoopField
-			SendInput(A_LoopField)
-			CheckAndConvert()
-		}
-		UpdateDisplay()
+		batchConvert(targetBuffer)
+;		clearBuffer()
+;		Loop Parse, targetBuffer
+;		{
+;			inputBuffer .= A_LoopField
+;			SendInput(A_LoopField)
+;			CheckAndConvert()
+;		}
+;		UpdateDisplay()
 	}
 }
 
@@ -632,14 +642,15 @@ shrinkandConvert(){
 	bslength := StrLen(targetBuffer)
 	SendInput("{BS " bslength "}")
 
-	clearBuffer()
-	Loop Parse, targetBuffer
-	{
-		inputBuffer .= A_LoopField
-		SendInput(A_LoopField)
-		CheckAndConvert()
-	}
-	UpdateDisplay()
+	batchConvert(targetBuffer)
+;	clearBuffer()
+;	Loop Parse, targetBuffer
+;	{
+;		inputBuffer .= A_LoopField
+;		SendInput(A_LoopField)
+;		CheckAndConvert()
+;	}
+;	UpdateDisplay()
 }
 
 ; バッファの先頭 1 文字を削除して変換
@@ -651,29 +662,29 @@ deleteandConvert(){
 	SendInput("{BS " bslength "}")
 
 	clearBuffer()
-	Loop Parse, targetBuffer
-	{
-		inputBuffer .= A_LoopField
-		SendInput(A_LoopField)
-		CheckAndConvert()
-	}
-	UpdateDisplay()
+	batchConvert(targetBuffer)
+;	Loop Parse, targetBuffer
+;	{
+;		inputBuffer .= A_LoopField
+;		SendInput(A_LoopField)
+;		CheckAndConvert()
+;	}
+;	UpdateDisplay()
 }
 
 
-; 漢字モード移行時にバッファが残っている
-batchConvert(){
+; バッファを一括変換
+batchConvert(targetBuffer){
 	global inputBuffer
-	targetBuffer := inputBuffer
-	bslength := StrLen(inputBuffer)
-	SendInput("{BS " bslength "}")
 
+	clearBuffer()
 	Loop Parse, targetBuffer
 	{
 		inputBuffer .= A_LoopField
 		SendInput(A_LoopField)
 		CheckAndConvert()
 	}
+	UpdateDisplay()	
 }
 
 
@@ -719,6 +730,11 @@ lookUpDict(keywards, &targetDict){
 			if (StrLen(word) = 1){
 				yomiData := paddedyomi
 				searchkey := " " . word . " "
+			}else if (SubStr(word, -1) == "@"){
+				word := SubStr(word, 1, -1)
+				yomiData := paddedyomi
+				searchkey := " " . word . " "
+
 			}else{
 				yomiData := data.yomi
 				searchkey := word
@@ -863,7 +879,6 @@ SwitchSetFromGui(GuiCtrlObj, Info) {
 	return
 }
 
-
 ; スクリプトの初期化時に ini ファイルを読み込む
 GUI_init()
 
@@ -880,6 +895,8 @@ UpdateDisplay()
 #HotIf WinActive("ahk_group directinput", )
 
 SetTimer(CheckHistory,moniterTimer) ; 60 秒間隔でチェック
+
+global vmarker := "kya kyu kyo sya syu sye syo tya tyu tyo nya nyu nyo hya hyu hyo mya myu myo rya ryu ryo xtu"
 
 $a::
 $b::
@@ -921,7 +938,7 @@ $.::
 $-::
 $/::
 {
-	global inputBuffer, inputMode, yomiBuffer
+	global inputBuffer, inputMode, yomiBuffer, vmarker
 
 	key1 := SubStr(A_ThisHotkey, 2)
 	SendInput(key1)
@@ -935,6 +952,27 @@ $/::
 			yomiBackup := yomiBuffer
 			yomiBuffer .= key1
 			result := lookupRefference()
+		} else if (inputMode == "Hira") {
+			ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
+			if (StrLen(inputBuffer) = 2 and InStr(vmarker, inputBuffer, 1) = 0){
+				changeInputMode("kanji")
+				CheckAndConvert()
+			} else if (StrLen(inputBuffer) > 2 and InStr(vmarker, inputBuffer, 1) = 0) {
+				changeInputMode("kanji")
+
+				targetBuffer := inputBuffer
+				bslength := StrLen(targetBuffer)
+				SendInput("{BS " bslength "}")
+
+				clearBuffer()
+				Loop Parse, targetBuffer
+				{
+					inputBuffer .= A_LoopField
+					SendInput(A_LoopField)
+					CheckAndConvert()
+				}
+				UpdateDisplay()
+			}
 		} else if (inputMode == "hira") {
 			ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
 		} else if (inputMode == "kata") {
@@ -944,41 +982,127 @@ $/::
 	}
 }
 
+;$+a::
+;$+i::
+;$+u::
+;$+e::
+;$+o::
+$@::
+{
+	global inputBuffer, inputMode, yomiBuffer, lastFixKey
+
+	key1 := SubStr(A_ThisHotkey, 2)
+;	key1 := SubStr(A_ThisHotkey, 3) ; +a～o の場合
+	SendInput(key1)
+	if (IME_GET() == 0){
+		backupBuffer := inputBuffer
+		inputBuffer .= key1
+		UpdateDisplay()
+		if (inputMode == "kanji"){
+			if(backupBuffer == ""){
+				; 再変換直後 or 起動直後
+				inputBuffer := key1
+			}else if (backupBuffer == lastFixKey){
+				; 2 文字 or 3 文字変換直後
+				if (StrLen(backupBuffer) > 2){
+					; 3 文字変換後
+					inputBuffer := key1
+				}else if (StrLen(backupBuffer) == 2) {
+					; 2 文字変換後
+					if (InStr(vmarker, backupBuffer, 1) != 0){
+						; 変換された文字の読みがマーカーに含まれている (sy='祥')
+						bslength := StrLen(dictionary.Get(lastFixKey, "")) + 1
+						SendInput("{BS " bslength "}" inputBuffer)
+					}else{
+						inputBuffer := key1
+					}
+				}
+			}else{
+				inputBuffer := SubStr(inputBuffer, 1, -1) . key1
+			}
+			changeInputMode("Hira")
+			ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
+		} else if (inputMode == "lookup"){
+			UpdateDisplay()
+			yomiBackup := yomiBuffer
+			yomiBuffer .= key1
+			result := lookupRefference()
+		} else if (inputMode == "Hira") {
+			changeInputMode("kanji")
+			CheckAndConvert()
+		} else if (inputMode == "hira") {
+			ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
+		} else if (inputMode == "kata") {
+			ConvertKana_realTime(inputBuffer, yomiBuffer, 2)
+		} else if (inputMode == "eisu") {
+			key := StrUpper(key1)
+			inputBuffer := SubStr(inputBuffer, 1, -1) . key
+			SendInput("{BS}" key)
+		}
+		UpdateDisplay()
+	}
+}
+
+
 $+a::
+$+i::
+$+u::
+$+e::
+$+o::
 $+b::
 $+c::
 $+d::
-$+e::
 $+f::
 $+g::
 $+h::
-$+i::
 $+j::
 $+k::
 $+l::
 $+m::
 $+n::
-$+o::
 $+p::
 $+q::
 $+r::
 $+s::
 $+t::
-$+u::
 $+v::
 $+w::
 $+x::
 $+y::
 $+z::
 { 
-	global inputBuffer
+	global inputBuffer, inputMode
 
 	key1 := SubStr(A_ThisHotkey, 3)
 	key := StrUpper(key1)
-	SendInput(key)
-	inputBuffer .= key
+	if (inputMode == "Hira"){
+		if(StrLen(lastfixKey)==2 and InStr("a i u e o", SubStr(lastfixKey, -1), 1)!=0){
+			changeInputMode("kanji")
+			SendInput(key1)
+			inputBuffer := lastfixKey . key1
+			
+			targetBuffer := inputBuffer
+			lastConverted := dictionaryKana[lastfixkey]["hira"]
+			bslength := StrLen(lastConverted) + 1
+			SendInput("{BS " bslength "}")
+			batchConvert(targetBuffer)
+		}else{
+			changeInputMode("kanji")
+			SendInput(key1)
+			inputBuffer .= key1
 
-	CheckAndConvert()
+			targetBuffer := inputBuffer
+			bslength := StrLen(targetBuffer)
+			SendInput("{BS " bslength "}")
+			batchConvert(targetBuffer)
+		}
+	}else{
+		SendInput(key)
+		inputBuffer .= key
+	}
+
+
+;	CheckAndConvert()
 
 	UpdateDisplay()
 }
@@ -1036,9 +1160,11 @@ $,::
 		yomiBuffer := SubStr(yomiBuffer, 1, -1)
 		lookupRefference()
 	}
-	
-	if(rinputBuffer == lastFixKey){
-		clearBuffer()
+
+	if (inputMode == "kanji"){
+		if(rinputBuffer == lastFixKey){
+			clearBuffer()
+		}
 	}
 
 	UpdateDisplay()
@@ -1177,19 +1303,29 @@ F5:: ;HK74_F5()
 	UpdateDisplay()
 }
 
+changeInputMode(mode){
+	global inputMode, gui1
+
+	inputMode := mode
+	gui1.BackColor := modeColor[mode]["bg"]
+	color := modeColor[mode]["text"]
+	gui1["textInputDisplay"].Opt("c" color)
+
+}
+
 ; 英数モード (ATOK 利用は廃止)
 F1::
 {
-	global inputMode, gui1, yomiBuffer
+	global inputMode
 
-	if (inputMode == "kanji" or inputMode == "hira" or inputMode == "kata") {
-		inputMode := "eisu"
-		gui1.BackColor := "606060"
-		gui1["textInputDisplay"].Opt("cwhite")
+	if (inputMode == "kanji" or inputMode == "hira" or inputMode == "kata" or inputMode == "Hira") {
+		changeInputMode("eisu")
 	} else if (inputMode == "eisu") {
-		inputMode := "kanji"
-		gui1.BackColor := "E0E0E0"
-		gui1["textInputDisplay"].Opt("cblack")
+		changeInputMode("kanji")
+		target := inputBuffer
+		bslength := StrLen(target)
+		SendInput("{BS " bslength "}")
+		batchConvert(target)
 	}
 	IME_SET(0)
 	clearBuffer()
@@ -1220,7 +1356,7 @@ F1::
 		imeStatus := 0
 	}
 
-	if (inputMode == "hira" or inputMode == "kata"){
+	if (inputMode == "hira" or inputMode == "kata" or inputMode == "Hira"){
 		if(inputBuffer != ""){
 			bslength := StrLen(inputBuffer)
 			if (bslength > 0){
@@ -1292,7 +1428,7 @@ F8::
 {
 	global inputMode, gui1, yomiBuffer
 
-	if (inputMode == "kanji" or inputMode == "eisu" or inputMode == "kata") {
+	if (inputMode == "kanji" or inputMode == "eisu" or inputMode == "kata" or inputMode == "Hira") {
 		inputMode := "hira"
 		gui1.BackColor := "F0C080"
 		gui1["textInputDisplay"].Opt("cblack")		
@@ -1312,7 +1448,7 @@ F7::
 {
 	global inputMode, gui1, yomiBuffer
 
-	if (inputMode == "kanji" or inputMode == "eisu" or inputMode == "hira") {
+	if (inputMode == "kanji" or inputMode == "eisu" or inputMode == "hira" or inputMode == "Hira") {
 		inputMode := "kata"
 		gui1.BackColor := "F0E080"
 		gui1["textInputDisplay"].Opt("cblack")
