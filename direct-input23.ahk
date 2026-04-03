@@ -45,6 +45,7 @@ global gui1 := ""
 global lookupPanel := ""
 global lookupResultOffset := 0
 
+
 global modeColor := Map()
 modeColor["kanji"] := Map("bg","E0E0E0", "text", "black")
 modeColor["hira"] := Map("bg","F0C080", "text", "black")
@@ -55,7 +56,10 @@ modeColor["eisu"] := Map("bg","606060", "text", "white")
 
 ; GUIの作成
 GUI_init() {
-	global gui1, lookupPanel
+	global gui1, lookupPanel, iniFile
+
+	posx := IniRead(iniFile, "InfoPanel", "x", 0)
+	posy := IniRead(iniFile, "InfoPanel", "y", 0)
 
 	mygui := Gui()
 	WinSetTransparent(180, mygui)
@@ -63,7 +67,7 @@ GUI_init() {
 	myGui.Title := "DI-buffer-monitor"
 	mygui.SetFont("s12")
 	mygui.Add("Text", "vtextInputDisplay w200")
-	mygui.Show("NoActivate x0 y0")
+	mygui.Show("NoActivate x" posx "y" posy)
 	gui1 :=mygui
 
 	mygui := Gui("+AlwaysOnTop +ToolWindow -Caption")
@@ -468,10 +472,13 @@ changefileset(set){
 
 ; 変換履歴と現在のセット番号を出力してから再起動
 writeandreload(){
-	global CurrentSet, iniFile
+	global CurrentSet, iniFile, gui1
 
 	writeLogs()
 	IniWrite(CurrentSet, iniFile, "Currentset", "set")
+	gui1.GetPos(&x, &y, &w, &h)
+	IniWrite(x, iniFile, "InfoPanel", "x")
+	IniWrite(y, iniFile, "InfoPanel", "y")
 	Reload()
 }
 
