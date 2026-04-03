@@ -1030,6 +1030,8 @@ $@::
 			yomiBuffer .= key1
 			result := lookupRefference()
 		} else if (inputMode == "Hira") {
+			SendInput("{BS 1}") ; @ の場合
+			clearBuffer()
 			changeInputMode("kanji")
 			CheckAndConvert()
 		} else if (inputMode == "hira") {
