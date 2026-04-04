@@ -44,7 +44,7 @@ global lookingActive := 0
 global gui1 := ""
 global lookupPanel := ""
 global lookupResultOffset := 0
-
+global vmarker := ""
 
 global modeColor := Map()
 modeColor["kanji"] := Map("bg","E0E0E0", "text", "black")
@@ -170,9 +170,10 @@ LoadDictionary(set) {
 }
 
 LoadDictionaryKana() {
-	global dictionaryKana, kanaDicFile
+	global dictionaryKana, kanaDicFile, vmarker
 
 	content := FileRead(kanaDicFile)
+	vmarker := ""
 
     Loop Parse, content, "`n", "`r"
     {
@@ -180,6 +181,9 @@ LoadDictionaryKana() {
             continue
         parts := StrSplit(A_LoopField, "=")
         if (parts.Length == 2)
+			if (StrLen(parts[1]) > 2){
+				vmarker .= parts[1] . " "
+			}
 			kana := StrSplit(parts[2],",")
 			dictionaryKana[parts[1]] := Map("hira", kana[1], "kata", kana[2])
     }
@@ -903,8 +907,6 @@ UpdateDisplay()
 
 SetTimer(CheckHistory,moniterTimer) ; 60 秒間隔でチェック
 
-global vmarker := "kya kyu kyo sya syu sye syo tya tyu tyo nya nyu nyo hya hyu hyo mya myu myo rya ryu ryo xtu"
-
 $a::
 $b::
 $c::
@@ -960,7 +962,8 @@ $/::
 			yomiBuffer .= key1
 			result := lookupRefference()
 		} else if (inputMode == "Hira") {
-			ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
+			yomiBuffer := inputBuffer
+			result := ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
 			if (StrLen(inputBuffer) = 2 and InStr(vmarker, inputBuffer, 1) = 0){
 				changeInputMode("kanji")
 				CheckAndConvert()
@@ -979,6 +982,15 @@ $/::
 					CheckAndConvert()
 				}
 				UpdateDisplay()
+			} else if (StrLen(result) > 1 and InStr("あ い う え お", SubStr(result, -1), 1) != 0){
+				changeInputMode("kanji")
+
+				targetBuffer := inputBackup . key1
+				bslength := StrLen(result)
+				SendInput("{BS " bslength "}")
+				clearBuffer()
+
+				batchConvert(targetBuffer)
 			}
 		} else if (inputMode == "hira") {
 			ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
