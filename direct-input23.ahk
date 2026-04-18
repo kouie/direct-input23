@@ -531,7 +531,7 @@ CreateGui_sonomama() {
 ConvertKana(targetBuffer, hiraKata){
 	global dictionaryKana
 
-	head := RegExMatch(targetBuffer, "[a-zA-Z]")
+	head := RegExMatch(targetBuffer, "[a-zA-Z\/\-]")
 	workingBuffer := SubStr(targetBuffer, (head)<1 ? (head)-1 : (head))
 
 	kanaset := "hira"
@@ -605,7 +605,7 @@ ConvertKana_realTime(targetBuffer, currentBuffer, hiraKata){
 		SendInput("{BS " bslength "}")
 		SendInput(value)
 		clearbuffer()
-		lastfixKey := key
+;		lastfixKey := key
 		updatedBuffer := SubStr(currentBuffer, 1, StrLen(currentBuffer) - bslength) . value
 	} else {
 		updatedBuffer := currentBuffer
@@ -686,7 +686,7 @@ deleteandConvert(){
 
 ; バッファを一括変換
 batchConvert(targetBuffer){
-	global inputBuffer
+	global inputBuffer, reCon_able
 
 	clearBuffer()
 	Loop Parse, targetBuffer
@@ -695,6 +695,7 @@ batchConvert(targetBuffer){
 		SendInput(A_LoopField)
 		CheckAndConvert()
 	}
+	reCon_able := 0
 	UpdateDisplay()	
 }
 
@@ -966,7 +967,11 @@ $/::
 			result := ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
 			if (StrLen(inputBuffer) = 2 and InStr(vmarker, inputBuffer, 1) = 0){
 				changeInputMode("kanji")
-				CheckAndConvert()
+				targetBuffer := inputBackup . key1
+				bslength := StrLen(result)
+				SendInput("{BS " bslength "}")
+				clearBuffer()
+				batchConvert(targetBuffer)				
 			} else if (StrLen(inputBuffer) > 2 and InStr(vmarker, inputBuffer, 1) = 0) {
 				changeInputMode("kanji")
 
@@ -974,14 +979,8 @@ $/::
 				bslength := StrLen(targetBuffer)
 				SendInput("{BS " bslength "}")
 
-				clearBuffer()
-				Loop Parse, targetBuffer
-				{
-					inputBuffer .= A_LoopField
-					SendInput(A_LoopField)
-					CheckAndConvert()
-				}
-				UpdateDisplay()
+				batchConvert(targetBuffer)
+
 			} else if (StrLen(result) > 1 and InStr("あ い う え お", SubStr(result, -1), 1) != 0){
 				changeInputMode("kanji")
 
@@ -1024,25 +1023,31 @@ $@::
 				; 再変換直後 or 起動直後
 				inputBuffer := key1
 			}else if (backupBuffer == lastFixKey){
-				; 2 文字 or 3 文字変換直後
-				if (StrLen(backupBuffer) > 2){
-					; 3 文字変換後
-					inputBuffer := key1
-				}else if (StrLen(backupBuffer) == 2) {
-					; 2 文字変換後
-					if (InStr(vmarker, backupBuffer, 1) != 0){
-						; 変換された文字の読みがマーカーに含まれている (sy='祥')
-						bslength := StrLen(dictionary.Get(lastFixKey, "")) + 1
-						SendInput("{BS " bslength "}" inputBuffer)
-					}else{
-						inputBuffer := key1
-					}
-				}
+;				; 2 文字 or 3 文字変換直後
+;				if (StrLen(backupBuffer) > 2){
+;					; 3 文字変換後
+;					inputBuffer := key1
+;				}else if (StrLen(backupBuffer) == 2) {
+;					; 2 文字変換後
+;					if (InStr(vmarker, backupBuffer, 1) != 0){
+;						; 変換された文字の読みがマーカーに含まれている (sy='祥')
+;						bslength := StrLen(dictionary.Get(lastFixKey, "")) + 1
+;						SendInput("{BS " bslength "}" inputBuffer)
+;					}else{
+;						inputBuffer := key1
+;					}
+;
+;				}
+				inputBuffer := key1
 			}else{
 				inputBuffer := SubStr(inputBuffer, 1, -1) . key1
 			}
 			changeInputMode("Hira")
-			ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
+			lastFixKey := ""
+			result := ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
+;			if (result == ""){
+;				clearBuffer()
+;			}
 		} else if (inputMode == "lookup"){
 			UpdateDisplay()
 			yomiBackup := yomiBuffer
@@ -1050,7 +1055,8 @@ $@::
 			result := lookupRefference()
 		} else if (inputMode == "Hira") {
 			SendInput("{BS 1}") ; @ の場合
-			clearBuffer()
+;			clearBuffer()
+			inputBuffer := backupBuffer
 			changeInputMode("kanji")
 			CheckAndConvert()
 		} else if (inputMode == "hira") {
@@ -1094,40 +1100,112 @@ $+x::
 $+y::
 $+z::
 { 
-	global inputBuffer, inputMode
+	global inputBuffer, inputMode, yomiBuffer, vmarker
 
 	key1 := SubStr(A_ThisHotkey, 3)
 	key := StrUpper(key1)
-	if (inputMode == "Hira"){
-		if(StrLen(lastfixKey)==2 and InStr("a i u e o", SubStr(lastfixKey, -1), 1)!=0){
-			changeInputMode("kanji")
-			SendInput(key1)
-			inputBuffer := lastfixKey . key1
-			
-			targetBuffer := inputBuffer
-			lastConverted := dictionaryKana[lastfixkey]["hira"]
-			bslength := StrLen(lastConverted) + 1
-			SendInput("{BS " bslength "}")
-			batchConvert(targetBuffer)
-		}else{
-			changeInputMode("kanji")
-			SendInput(key1)
-			inputBuffer .= key1
+	key1 := key
 
-			targetBuffer := inputBuffer
-			bslength := StrLen(targetBuffer)
-			SendInput("{BS " bslength "}")
-			batchConvert(targetBuffer)
+	SendInput(key1)
+	if (IME_GET() == 0){
+		inputBackup := inputBuffer
+		inputBuffer .= key1
+		UpdateDisplay()
+		if (inputMode == "kanji"){
+			CheckAndConvert()
+		} else if (inputMode == "lookup"){
+			yomiBackup := yomiBuffer
+			yomiBuffer .= key1
+			result := lookupRefference()
+		} else if (inputMode == "Hira") {
+			yomiBuffer := inputBuffer
+			result := ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
+			if (StrLen(inputBuffer) = 2 and InStr(vmarker, inputBuffer, 1) = 0){
+				changeInputMode("kanji")
+				targetBuffer := inputBackup . key1
+				bslength := StrLen(result)
+				SendInput("{BS " bslength "}")
+				clearBuffer()
+				batchConvert(targetBuffer)				
+			} else if (StrLen(inputBuffer) > 2 and InStr(vmarker, inputBuffer, 1) = 0) {
+				changeInputMode("kanji")
+
+				targetBuffer := inputBuffer
+				bslength := StrLen(targetBuffer)
+				SendInput("{BS " bslength "}")
+
+				batchConvert(targetBuffer)
+
+			} else if (StrLen(result) > 1 and InStr("あ い う え お", SubStr(result, -1), 1) != 0){
+				changeInputMode("kanji")
+
+				targetBuffer := inputBackup . key1
+				bslength := StrLen(result)
+				SendInput("{BS " bslength "}")
+				clearBuffer()
+
+				batchConvert(targetBuffer)
+			}
+		} else if (inputMode == "hira") {
+			ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
+		} else if (inputMode == "kata") {
+			ConvertKana_realTime(inputBuffer, yomiBuffer, 2)
 		}
-	}else{
-		SendInput(key)
-		inputBuffer .= key
+		UpdateDisplay()
 	}
 
 
-;	CheckAndConvert()
+; ここから - 小文字のコードと同じで Ok ? (key1 を ,3 でとるところ以外)
+;if (IME_GET() == 0){
+;	inputBackup := inputBuffer
+;	inputBuffer .= key1
+;	UpdateDisplay()
+;	if (inputMode == "kanji"){
+;		CheckAndConvert()
+;	} else if (inputMode == "lookup"){
+;		yomiBackup := yomiBuffer
+;		yomiBuffer .= key1
+;		result := lookupRefference()
+;	} else if (inputMode == "Hira") {
+;		yomiBuffer := inputBuffer
+;		result := ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
+;		if (StrLen(inputBuffer) = 2 and InStr(vmarker, inputBuffer, 1) = 0){
+;			changeInputMode("kanji")
+;			CheckAndConvert()
+;		} else if (StrLen(inputBuffer) > 2 and InStr(vmarker, inputBuffer, 1) = 0) {
+;			changeInputMode("kanji")
+;
+;			targetBuffer := inputBuffer
+;			bslength := StrLen(targetBuffer)
+;			SendInput("{BS " bslength "}")
+;
+;			clearBuffer()
+;			Loop Parse, targetBuffer
+;			{
+;				inputBuffer .= A_LoopField
+;				SendInput(A_LoopField)
+;				CheckAndConvert()
+;			}
+;			UpdateDisplay()
+;		} else if (StrLen(result) > 1 and InStr("あ い う え お", SubStr(result, -1), 1) != 0){
+;			changeInputMode("kanji")
+;
+;			targetBuffer := inputBackup . key1
+;			bslength := StrLen(result)
+;			SendInput("{BS " bslength "}")
+;			clearBuffer()
+;
+;			batchConvert(targetBuffer)
+;		}
+;	} else if (inputMode == "hira") {
+;		ConvertKana_realTime(inputBuffer, yomiBuffer, 1)
+;	} else if (inputMode == "kata") {
+;		ConvertKana_realTime(inputBuffer, yomiBuffer, 2)
+;	}
+;	UpdateDisplay()
+;}
 
-	UpdateDisplay()
+; ここまで
 }
 
 $,::
@@ -1276,7 +1354,11 @@ $Tab:: ;HK71_Tab()
 
 #SuspendExempt False
 
-sc029::
+sc029::	;個人設定
+{
+	return
+}
+!sc029::
 {
 	global imeStatus, gui1, f1mode, inputMode 
 	; [半角/全角] キー
